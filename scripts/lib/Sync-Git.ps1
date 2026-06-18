@@ -168,20 +168,8 @@ function Get-CommitMetadata {
         [Parameter(Mandatory)][string] $Commit
     )
 
-    $format = '%an|%ae|%at|%s'
-    $line = (Invoke-Git -RepoPath $MirrorPath -GitArgs @('log', '-1', "--format=$format", $Commit)).ToString().Trim()
-    $parts = $line -split '\|', 4
-    $body = (Invoke-Git -RepoPath $MirrorPath -GitArgs @('log', '-1', '--format=%b', $Commit)).ToString()
-    $body = ConvertTo-UnixLineEndings -Text $body
-    $body = $body.TrimEnd()
-
-    return [pscustomobject]@{
-        AuthorName = $parts[0]
-        AuthorEmail = $parts[1]
-        AuthorDate = [int64]$parts[2]
-        Subject = $parts[3]
-        Body = $body
-    }
+    $raw = Invoke-GitText -RepoPath $MirrorPath -GitArgs @('cat-file', '-p', $Commit)
+    return Parse-GitCommitObject -Raw $raw
 }
 
 function Format-ReplayCommitMessage {
@@ -209,14 +197,14 @@ function Get-LsTreeEntries {
         [string] $PathPrefix
     )
 
-    $args = @('ls-tree', '-r', $Treeish)
+    $args = @('ls-tree', '-r', '-z', $Treeish)
     if ($PathPrefix) { $args += '--' ; $args += $PathPrefix }
-    $lines = Invoke-Git -RepoPath $MirrorPath -GitArgs $args
+    $raw = Invoke-GitText -RepoPath $MirrorPath -GitArgs $args
+    $tokens = $raw.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
+
     $entries = @()
-    foreach ($line in $lines) {
-        $text = $line.ToString().Trim()
-        if (-not $text) { continue }
-        if ($text -match '^(\d+)\s(\S+)\s([0-9a-f]{40})\s(.+)$') {
+    foreach ($token in $tokens) {
+        if ($token -match '^(\d+)\s(\S+)\s([0-9a-f]{40})\t(.+)$') {
             $entries += [pscustomobject]@{
                 Mode = $Matches[1]
                 Type = $Matches[2]

@@ -1,11 +1,11 @@
 {
-  "replaySpecVersion": 1,
+  "replaySpecVersion": 2,
   "baseCommit": "6fc20894663468a04dd4986a8b1c15a9d5ae8649",
   "upstreamPins": {
-    "ports": null,
-    "ports-mingw": null
+    "ports": "aac3de013fac752c5d052883f4de45b574005bc2",
+    "ports-mingw": "b1a9ee520e8db449debb62b6f3eb3232bd7eae7d"
   },
-  "commitCount": 0,
-  "destinationTipSha": null,
-  "treeRootSha": null
+  "commitCount": 1,
+  "destinationTipSha": "b7f6516a9e937b951a061ff3640e111654e61b50",
+  "treeRootSha": "95f32c04343e9ed8518a89c39f3dc3d4198cb81e-empty"
 }

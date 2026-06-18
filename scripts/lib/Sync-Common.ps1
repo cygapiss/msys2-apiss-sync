@@ -62,3 +62,87 @@ function ConvertTo-UnixLineEndings {
     if ($null -eq $Text) { return '' }
     return ($Text -replace "`r`n", "`n" -replace "`r", "`n")
 }
+
+function Set-SyncUtf8Environment {
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    [Console]::OutputEncoding = $utf8
+    [Console]::InputEncoding = $utf8
+    $OutputEncoding = $utf8
+    $env:LANG = 'C.UTF-8'
+    $env:LC_ALL = 'C.UTF-8'
+}
+
+function Invoke-GitText {
+    param(
+        [string] $RepoPath,
+        [Parameter(Mandatory)]
+        [string[]] $GitArgs
+    )
+
+    $psi = [System.Diagnostics.ProcessStartInfo]::new('git')
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $psi.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+
+    if ($RepoPath) {
+        [void]$psi.ArgumentList.Add('-C')
+        [void]$psi.ArgumentList.Add($RepoPath)
+    }
+    foreach ($arg in $GitArgs) {
+        [void]$psi.ArgumentList.Add($arg)
+    }
+
+    $process = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    if ($process.ExitCode -ne 0) {
+        $cmd = if ($RepoPath) { "git -C $RepoPath $($GitArgs -join ' ')" } else { "git $($GitArgs -join ' ')" }
+        throw "git command failed ($cmd): $stderr"
+    }
+
+    return $stdout
+}
+
+function Parse-GitCommitObject {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Raw
+    )
+
+    $raw = ConvertTo-UnixLineEndings -Text $Raw
+    $authorName = $null
+    $authorEmail = $null
+    $authorDate = 0
+
+    foreach ($line in ($raw -split "`n")) {
+        if ($line -match '^author (.+) <([^>]+)> (\d+) ') {
+            $authorName = $Matches[1]
+            $authorEmail = $Matches[2]
+            $authorDate = [int64]$Matches[3]
+            break
+        }
+    }
+
+    if (-not $authorName) {
+        throw 'Could not parse author from git commit object.'
+    }
+
+    $blankIdx = $raw.IndexOf("`n`n")
+    $message = if ($blankIdx -ge 0) { $raw.Substring($blankIdx + 2) } else { '' }
+    $message = $message.TrimEnd("`n")
+    $msgParts = $message -split "`n", 2
+    $subject = $msgParts[0]
+    $body = if ($msgParts.Count -gt 1) { $msgParts[1].TrimEnd() } else { '' }
+
+    return [pscustomobject]@{
+        AuthorName = $authorName
+        AuthorEmail = $authorEmail
+        AuthorDate = $authorDate
+        Subject = $subject
+        Body = $body
+    }
+}

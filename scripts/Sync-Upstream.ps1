@@ -19,6 +19,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. "$PSScriptRoot/lib/Sync-Common.ps1"
+Set-SyncUtf8Environment
 . "$PSScriptRoot/lib/Sync-Replay.ps1"
 
 try {
