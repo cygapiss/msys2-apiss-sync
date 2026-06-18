@@ -15,20 +15,122 @@ function Write-SyncLog {
     Write-Host "$prefix $Message"
 }
 
+function Clear-GitLockFiles {
+    param(
+        [Parameter(Mandatory)][string] $RepoPath
+    )
+
+    $gitDir = Join-Path $RepoPath '.git'
+    foreach ($name in @('index.lock', 'shallow.lock', 'HEAD.lock')) {
+        $lockPath = Join-Path $gitDir $name
+        if (-not (Test-Path -LiteralPath $lockPath)) {
+            continue
+        }
+
+        try {
+            Remove-Item -LiteralPath $lockPath -Force -ErrorAction Stop
+            Write-SyncLog "Removed stale git lock: $name" -Level Warn
+        }
+        catch {
+            Write-SyncLog "Could not remove git lock $name : $($_.Exception.Message)" -Level Warn
+        }
+    }
+}
+
+function Test-GitLockError {
+    param([string] $Text)
+    return $Text -match 'index\.lock|Unable to create.*\.lock|Another git process'
+}
+
 function Invoke-Git {
     param(
         [string] $RepoPath,
         [Parameter(Mandatory)]
-        [string[]] $GitArgs
+        [string[]] $GitArgs,
+        [int] $MaxAttempts = 5
     )
 
     $allArgs = if ($RepoPath) { @('-C', $RepoPath) + $GitArgs } else { $GitArgs }
-    $output = & git @allArgs 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $attempt = 0
+    $lastOutput = $null
+
+    while ($attempt -lt $MaxAttempts) {
+        $attempt++
+        $output = & git @allArgs 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $output
+        }
+
+        $lastOutput = "$output"
+        if ($RepoPath -and (Test-GitLockError -Text $lastOutput) -and $attempt -lt $MaxAttempts) {
+            Clear-GitLockFiles -RepoPath $RepoPath
+            Start-Sleep -Milliseconds (200 * $attempt)
+            continue
+        }
+
         $cmd = "git $($allArgs -join ' ')"
-        throw "git command failed ($cmd): $output"
+        throw "git command failed ($cmd): $lastOutput"
     }
-    return $output
+
+    $cmd = "git $($allArgs -join ' ')"
+    throw "git command failed ($cmd): $lastOutput"
+}
+
+function Invoke-GitStdin {
+    param(
+        [string] $RepoPath,
+        [Parameter(Mandatory)]
+        [string[]] $GitArgs,
+        [Parameter(Mandatory)]
+        [string] $InputText,
+        [int] $MaxAttempts = 5
+    )
+
+    $attempt = 0
+    $lastOutput = $null
+
+    while ($attempt -lt $MaxAttempts) {
+        $attempt++
+        $psi = [System.Diagnostics.ProcessStartInfo]::new('git')
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        $psi.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+
+        if ($RepoPath) {
+            [void]$psi.ArgumentList.Add('-C')
+            [void]$psi.ArgumentList.Add($RepoPath)
+        }
+        foreach ($arg in $GitArgs) {
+            [void]$psi.ArgumentList.Add($arg)
+        }
+
+        $process = [System.Diagnostics.Process]::Start($psi)
+        $process.StandardInput.Write($InputText)
+        $process.StandardInput.Close()
+        $stdout = $process.StandardOutput.ReadToEnd()
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+
+        if ($process.ExitCode -eq 0) {
+            return $stdout
+        }
+
+        $lastOutput = $stderr
+        if ($RepoPath -and (Test-GitLockError -Text $lastOutput) -and $attempt -lt $MaxAttempts) {
+            Clear-GitLockFiles -RepoPath $RepoPath
+            Start-Sleep -Milliseconds (200 * $attempt)
+            continue
+        }
+
+        $cmd = if ($RepoPath) { "git -C $RepoPath $($GitArgs -join ' ')" } else { "git $($GitArgs -join ' ')" }
+        throw "git command failed ($cmd): $lastOutput"
+    }
+
+    $cmd = if ($RepoPath) { "git -C $RepoPath $($GitArgs -join ' ')" } else { "git $($GitArgs -join ' ')" }
+    throw "git command failed ($cmd): $lastOutput"
 }
 
 function Get-SyncRepoRoot {

@@ -118,6 +118,8 @@ function Start-ReplaySync {
 
     Write-SyncLog "Replay mode=$Mode branch=$branch pending=$($queue.Count) commits"
 
+    Clear-GitLockFiles -RepoPath $destPath
+
     $replayed = 0
     $index = 0
 
@@ -155,6 +157,8 @@ function Start-ReplaySync {
             $replayed++
             if ($index % 100 -eq 0) {
                 Write-SyncLog "Progress: $index / $($queue.Count) ($replayed replayed)"
+                $state.destinationBranchTip = Get-DestinationBranchTip -DestinationPath $destPath -BranchName $branch
+                Save-SyncState -RepoRoot $RepoRoot -State $state
             }
         }
     }

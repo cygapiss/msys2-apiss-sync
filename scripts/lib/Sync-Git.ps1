@@ -239,6 +239,8 @@ function Apply-UpstreamCommitToIndex {
 
     $allPaths = @($parentEntries.Keys + $commitEntries.Keys | Select-Object -Unique)
     $changed = $false
+    $indexLines = New-Object System.Collections.Generic.List[string]
+    $removePaths = New-Object System.Collections.Generic.List[string]
 
     foreach ($path in $allPaths) {
         $destPath = "$DestSubdir/$path"
@@ -251,24 +253,30 @@ function Apply-UpstreamCommitToIndex {
             if ($p.Sha -eq $c.Sha -and $p.Mode -eq $c.Mode) {
                 continue
             }
-            Invoke-Git -RepoPath $DestinationPath -GitArgs @(
-                'update-index', '--add', '--cacheinfo', $c.Mode, $c.Sha, $destPath
-            )
+            [void]$indexLines.Add("$($c.Mode) $($c.Sha)`t$destPath")
             $changed = $true
         }
         elseif ($inCommit) {
             $c = $commitEntries[$path]
-            Invoke-Git -RepoPath $DestinationPath -GitArgs @(
-                'update-index', '--add', '--cacheinfo', $c.Mode, $c.Sha, $destPath
-            )
+            [void]$indexLines.Add("$($c.Mode) $($c.Sha)`t$destPath")
             $changed = $true
         }
         else {
-            Invoke-Git -RepoPath $DestinationPath -GitArgs @(
-                'rm', '--cached', '-f', '--ignore-unmatch', '--', $destPath
-            )
+            [void]$removePaths.Add($destPath)
             $changed = $true
         }
+    }
+
+    if ($indexLines.Count -gt 0) {
+        $infoText = (($indexLines | ForEach-Object { "$_`n" }) -join '')
+        $null = Invoke-GitStdin -RepoPath $DestinationPath -GitArgs @(
+            'update-index', '--index-info'
+        ) -InputText $infoText
+    }
+
+    if ($removePaths.Count -gt 0) {
+        $removeArgs = @('rm', '--cached', '-f', '--ignore-unmatch', '--') + $removePaths
+        $null = Invoke-Git -RepoPath $DestinationPath -GitArgs $removeArgs
     }
 
     return $changed
