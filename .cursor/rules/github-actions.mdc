@@ -1,0 +1,48 @@
+---
+description: GitHub Actions workflow conventions for upstream sync
+globs: ".github/workflows/*.yml"
+alwaysApply: false
+---
+
+# GitHub Actions
+
+## Workflows
+
+| File | Purpose |
+|------|---------|
+| `sync-upstream.yml` | Incremental sync: `*/5` cron, daily cron, `workflow_dispatch` |
+| `sync-bootstrap.yml` | Manual full history replay only |
+
+## Runner
+
+- Prefer `ubuntu-latest` with `actions/setup-powershell@v5` for `pwsh`.
+- Install/verify `git` before running sync scripts.
+
+## Concurrency
+
+```yaml
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: true
+```
+
+## Secrets
+
+- `MSYS2_UWP_SYNC_TOKEN`: write access to `msys2-uwp/msys2-uwp`
+- Never log tokens; pass via `env:` to script steps only.
+
+## Push policy
+
+- Push only branch `upstream` on destination repo.
+- Commit and push `.sync/state.json` to this repo when cursors change.
+- Skip destination push when script reports no new commits.
+- Use bot identity: `github-actions[bot]`.
+
+## Permissions
+
+```yaml
+permissions:
+  contents: read   # this repo
+```
+
+Destination clone/push uses PAT secret, not `GITHUB_TOKEN` write to other repos.

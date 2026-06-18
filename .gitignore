@@ -1,0 +1,14 @@
+# PowerShell
+*.log
+*.tmp
+
+# Sync workspace
+.work/
+.cache/
+state/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
