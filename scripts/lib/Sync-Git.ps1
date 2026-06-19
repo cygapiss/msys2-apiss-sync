@@ -170,25 +170,141 @@ function Get-UpstreamCommitEntries {
         [string] $UntilSha
     )
 
+    $text = Export-UpstreamCommitLog -MirrorPath $MirrorPath -AfterSha $AfterSha -UntilSha $UntilSha
+    return ConvertFrom-UpstreamCommitLogText -Text $text
+}
+
+function Export-UpstreamCommitLog {
+    param(
+        [Parameter(Mandatory)][string] $MirrorPath,
+        [string] $AfterSha,
+        [Parameter(Mandatory)][string] $UntilSha
+    )
+
     $range = if ($AfterSha) { "$AfterSha..$UntilSha" } else { $UntilSha }
     $format = '%H|%at|%ct'
     $lines = Invoke-Git -RepoPath $MirrorPath -GitArgs @(
         'log', '--reverse', "--format=$format", $range
     )
 
-    $entries = @()
-    foreach ($line in $lines) {
-        $text = $line.ToString().Trim()
+    $text = (($lines | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ }) -join "`n")
+    if ($text) {
+        $text += "`n"
+    }
+    return $text
+}
+
+function Get-UpstreamCommitLogMetadataFormat {
+    # Field sep: 0x1f; record sep: 0x1e (after %B, which may contain newlines).
+    return '%H%x1f%an%x1f%ae%x1f%at%x1f%ct%x1f%B%x1e'
+}
+
+function Split-GitLogCommitMessage {
+    param([AllowNull()][string] $Message)
+
+    $message = ConvertTo-UnixLineEndings -Text $Message
+    $message = $message.TrimEnd("`n")
+    if (-not $message) {
+        return @{ Subject = ''; Body = '' }
+    }
+
+    $msgParts = $message -split "`n", 2
+    return @{
+        Subject = $msgParts[0]
+        Body = if ($msgParts.Count -gt 1) { $msgParts[1].TrimEnd() } else { '' }
+    }
+}
+
+function ConvertFrom-UpstreamCommitLogMetadataText {
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Text
+    )
+
+    $text = ConvertTo-UnixLineEndings -Text $Text
+    $text = $text.Trim()
+    if (-not $text) {
+        return @()
+    }
+
+    $recordSep = [char]0x1e
+    $fieldSep = [char]0x1f
+    $entries = New-Object System.Collections.Generic.List[object]
+
+    foreach ($record in $text.Split($recordSep, [StringSplitOptions]::RemoveEmptyEntries)) {
+        $record = $record.Trim()
+        if (-not $record) {
+            continue
+        }
+
+        $parts = $record.Split($fieldSep, 6)
+        if ($parts.Count -lt 6) {
+            $preview = $record.Substring(0, [Math]::Min(120, $record.Length))
+            throw "Invalid upstream commit log record (expected 6 fields, got $($parts.Count)): $preview"
+        }
+
+        $split = Split-GitLogCommitMessage -Message $parts[5]
+        [void]$entries.Add([pscustomobject]@{
+            Sha = $parts[0]
+            AuthorDate = [int64]$parts[3]
+            CommitterDate = [int64]$parts[4]
+            AuthorName = $parts[1]
+            AuthorEmail = $parts[2]
+            Subject = $split.Subject
+            Body = $split.Body
+        })
+    }
+
+    return $entries.ToArray()
+}
+
+function Export-UpstreamCommitLogRawText {
+    param(
+        [Parameter(Mandatory)][string] $MirrorPath,
+        [string] $AfterSha,
+        [Parameter(Mandatory)][string] $UntilSha
+    )
+
+    $range = if ($AfterSha) { "$AfterSha..$UntilSha" } else { $UntilSha }
+    $format = Get-UpstreamCommitLogMetadataFormat
+    $text = Invoke-GitText -RepoPath $MirrorPath -GitArgs @(
+        'log', '--reverse', "--format=$format", $range
+    )
+    return (ConvertTo-UnixLineEndings -Text $text).Trim()
+}
+
+function Export-UpstreamCommitLogWithMetadata {
+    param(
+        [Parameter(Mandatory)][string] $MirrorPath,
+        [string] $AfterSha,
+        [Parameter(Mandatory)][string] $UntilSha
+    )
+
+    return ConvertFrom-UpstreamCommitLogMetadataText -Text (
+        Export-UpstreamCommitLogRawText -MirrorPath $MirrorPath -AfterSha $AfterSha -UntilSha $UntilSha
+    )
+}
+
+function ConvertFrom-UpstreamCommitLogText {
+    param(
+        [Parameter(Mandatory)][string] $Text
+    )
+
+    $entries = New-Object System.Collections.Generic.List[object]
+    foreach ($line in ($Text -split "`n")) {
+        $text = $line.Trim()
         if (-not $text) { continue }
         $parts = $text -split '\|'
         if ($parts.Count -lt 3) { continue }
-        $entries += [pscustomobject]@{
+        [void]$entries.Add([pscustomobject]@{
             Sha = $parts[0]
             AuthorDate = [int64]$parts[1]
             CommitterDate = [int64]$parts[2]
-        }
+        })
     }
-    return $entries
+
+    return $entries.ToArray()
 }
 
 function Get-CommitMetadata {
@@ -218,30 +334,71 @@ function Format-ReplayCommitMessage {
     return ConvertTo-UnixLineEndings -Text "[${SortKey}] ${subject}`n`n$footer"
 }
 
-function Get-LsTreeEntries {
+function Get-DiffTreeEntries {
     param(
         [Parameter(Mandatory)][string] $MirrorPath,
-        [Parameter(Mandatory)][string] $Treeish,
-        [string] $PathPrefix
+        [Parameter(Mandatory)][string] $Parent,
+        [Parameter(Mandatory)][string] $Commit
     )
 
-    $args = @('ls-tree', '-r', '-z', $Treeish)
-    if ($PathPrefix) { $args += '--' ; $args += $PathPrefix }
-    $raw = Invoke-GitText -RepoPath $MirrorPath -GitArgs $args
-    $tokens = $raw.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
+    $raw = Invoke-GitText -RepoPath $MirrorPath -GitArgs @(
+        'diff-tree', '-r', '-z', '-M', '--no-commit-id', $Parent, $Commit
+    )
+    if (-not $raw) {
+        return @()
+    }
 
-    $entries = @()
-    foreach ($token in $tokens) {
-        if ($token -match '^(\d+)\s(\S+)\s([0-9a-f]{40})\t(.+)$') {
-            $entries += [pscustomobject]@{
-                Mode = $Matches[1]
-                Type = $Matches[2]
-                Sha = $Matches[3]
-                Path = $Matches[4]
+    $tokens = $raw.Split([char]0, [StringSplitOptions]::RemoveEmptyEntries)
+    $entries = New-Object System.Collections.Generic.List[object]
+    $i = 0
+
+    while ($i -lt $tokens.Count) {
+        $token = $tokens[$i]
+        if ($token -notmatch '^:(\d+) (\d+) ([0-9a-f]{40}) ([0-9a-f]{40}) (\S+)$') {
+            $i++
+            continue
+        }
+
+        $oldMode = $Matches[1]
+        $newMode = $Matches[2]
+        $newSha = $Matches[4]
+        $status = $Matches[5]
+        $i++
+
+        if ($status -match '^R') {
+            if ($i + 1 -ge $tokens.Count) {
+                throw "Unexpected diff-tree rename payload for commit $Commit"
             }
+            [void]$entries.Add([pscustomobject]@{ Kind = 'Delete'; Path = $tokens[$i] })
+            [void]$entries.Add([pscustomobject]@{
+                Kind = 'Update'
+                Path = $tokens[$i + 1]
+                Mode = $newMode
+                Sha = $newSha
+            })
+            $i += 2
+            continue
+        }
+
+        if ($i -ge $tokens.Count) {
+            throw "Unexpected diff-tree payload for commit $Commit"
+        }
+
+        $path = $tokens[$i++]
+        if ($status -eq 'D' -or $newMode -eq '000000') {
+            [void]$entries.Add([pscustomobject]@{ Kind = 'Delete'; Path = $path })
+        }
+        else {
+            [void]$entries.Add([pscustomobject]@{
+                Kind = 'Update'
+                Path = $path
+                Mode = $newMode
+                Sha = $newSha
+            })
         }
     }
-    return $entries
+
+    return [object[]]$entries
 }
 
 function Apply-UpstreamCommitToIndex {
@@ -253,46 +410,23 @@ function Apply-UpstreamCommitToIndex {
         [Parameter(Mandatory)][string] $DestinationPath
     )
 
+    $diffEntries = Get-DiffTreeEntries -MirrorPath $MirrorPath -Parent $Parent -Commit $Commit
+    if ($diffEntries.Count -eq 0) {
+        return $false
+    }
+
     $null = Invoke-Git -RepoPath $DestinationPath -GitArgs @('read-tree', 'HEAD')
 
-    $parentEntries = @{}
-    foreach ($entry in (Get-LsTreeEntries -MirrorPath $MirrorPath -Treeish $Parent)) {
-        $parentEntries[$entry.Path] = $entry
-    }
-
-    $commitEntries = @{}
-    foreach ($entry in (Get-LsTreeEntries -MirrorPath $MirrorPath -Treeish $Commit)) {
-        $commitEntries[$entry.Path] = $entry
-    }
-
-    $allPaths = @($parentEntries.Keys + $commitEntries.Keys | Select-Object -Unique)
-    $changed = $false
     $indexLines = New-Object System.Collections.Generic.List[string]
     $removePaths = New-Object System.Collections.Generic.List[string]
 
-    foreach ($path in $allPaths) {
-        $destPath = "$DestSubdir/$path"
-        $inParent = $parentEntries.ContainsKey($path)
-        $inCommit = $commitEntries.ContainsKey($path)
+    foreach ($entry in $diffEntries) {
+        if ($entry.Kind -eq 'Delete') {
+            [void]$removePaths.Add("$DestSubdir/$($entry.Path)")
+            continue
+        }
 
-        if ($inParent -and $inCommit) {
-            $p = $parentEntries[$path]
-            $c = $commitEntries[$path]
-            if ($p.Sha -eq $c.Sha -and $p.Mode -eq $c.Mode) {
-                continue
-            }
-            [void]$indexLines.Add("$($c.Mode) $($c.Sha)`t$destPath")
-            $changed = $true
-        }
-        elseif ($inCommit) {
-            $c = $commitEntries[$path]
-            [void]$indexLines.Add("$($c.Mode) $($c.Sha)`t$destPath")
-            $changed = $true
-        }
-        else {
-            [void]$removePaths.Add($destPath)
-            $changed = $true
-        }
+        [void]$indexLines.Add("$($entry.Mode) $($entry.Sha)`t$DestSubdir/$($entry.Path)")
     }
 
     if ($indexLines.Count -gt 0) {
@@ -307,7 +441,7 @@ function Apply-UpstreamCommitToIndex {
         $null = Invoke-Git -RepoPath $DestinationPath -GitArgs $removeArgs
     }
 
-    return $changed
+    return $true
 }
 
 function New-ReplayCommit {
@@ -335,7 +469,6 @@ function New-ReplayCommit {
             'commit-tree', $tree, '-p', $parent, '-F', $messagePath
         )).ToString().Trim()
         $null = Invoke-Git -RepoPath $DestinationPath -GitArgs @('update-ref', 'HEAD', $newCommit, $parent)
-        $null = Invoke-Git -RepoPath $DestinationPath -GitArgs @('reset', '--hard', 'HEAD')
     }
     finally {
         Remove-Item -LiteralPath $messagePath -Force -ErrorAction SilentlyContinue
@@ -414,15 +547,46 @@ function Filter-ReplayQueueByAge {
     return $eligible
 }
 
+function Get-ReplaySortRank {
+    param(
+        [Parameter(Mandatory)][int64] $AuthorDate,
+        [Parameter(Mandatory)][int64] $CommitterDate,
+        [Parameter(Mandatory)][string] $SortKey,
+        [Parameter(Mandatory)][string] $Sha
+    )
+
+    return ('{0:D12}|{1:D12}|{2}|{3}' -f $AuthorDate, $CommitterDate, $SortKey, $Sha)
+}
+
+function New-ReplayQueueItem {
+    param(
+        [Parameter(Mandatory)][string] $SourceId,
+        [Parameter(Mandatory)] $SourceEntry,
+        [Parameter(Mandatory)][string] $MirrorPath,
+        [Parameter(Mandatory)] $LogEntry
+    )
+
+    return [pscustomobject]@{
+        SourceId = $SourceId
+        SortKey = $SourceEntry.sortKey
+        DestSubdir = $SourceEntry.destSubdir
+        UpstreamRepo = Get-SourceRepoSlug -SourceEntry $SourceEntry
+        MirrorPath = $MirrorPath
+        Sha = $LogEntry.Sha
+        AuthorDate = $LogEntry.AuthorDate
+        CommitterDate = $LogEntry.CommitterDate
+        SortRank = (Get-ReplaySortRank `
+            -AuthorDate $LogEntry.AuthorDate `
+            -CommitterDate $LogEntry.CommitterDate `
+            -SortKey $SourceEntry.sortKey `
+            -Sha $LogEntry.Sha)
+    }
+}
+
 function Sort-ReplayCommitQueue {
     param(
         [Parameter(Mandatory)][object[]] $Queue
     )
 
-    return $Queue | Sort-Object -Property @(
-        @{ Expression = { $_.AuthorDate } },
-        @{ Expression = { $_.CommitterDate } },
-        @{ Expression = { $_.SortKey } },
-        @{ Expression = { $_.Sha } }
-    )
+    return @($Queue | Sort-Object -Property SortRank)
 }

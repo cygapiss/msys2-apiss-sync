@@ -1,0 +1,41 @@
+name: Mirror sync from upstream
+
+# Install this workflow in each mirror repo under msys2-uwp/.
+# Copy to: .github/workflows/mirror-sync.yml
+# Set repository variable UPSTREAM_REPO (e.g. msys2/MSYS2-packages).
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mirror
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync from upstream
+        env:
+          UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
+        run: |
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" 2>/dev/null || \
+            git remote set-url upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch upstream master
+          BEFORE="$(git rev-parse HEAD)"
+          git merge --ff-only upstream/master
+          AFTER="$(git rev-parse HEAD)"
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "No upstream changes."
+          else
+            echo "Advanced mirror to ${AFTER}"
+          fi
+
+      - name: Push mirror
+        run: git push origin HEAD:master

@@ -3,9 +3,9 @@
   "replaySpecVersion": 3,
   "syncRepo": {
     "owner": "msys2-uwp",
-    "repo": "-msys2-uwp-sync",
+    "repo": "msys2-uwp-sync",
     "branch": "main",
-    "url": "https://github.com/msys2-uwp/-msys2-uwp-sync.git"
+    "url": "https://github.com/msys2-uwp/msys2-uwp-sync.git"
   },
   "destination": {
     "owner": "msys2-uwp",
@@ -30,13 +30,23 @@
       "sortKey": "ports-mingw"
     }
   },
+  "mirrors": {
+    "owner": "msys2-uwp",
+    "repos": {
+      "ports": "MSYS2-packages-mirror",
+      "ports-mingw": "MINGW-packages-mirror"
+    },
+    "syncIntervalMinutes": 5,
+    "dispatchEventType": "upstream-updated"
+  },
   "replay": {
     "committerName": "msys2-uwp-sync-bot",
     "committerEmail": "msys2-uwp-sync-bot@users.noreply.github.com",
     "committerDateFromAuthor": true,
     "lineEnding": "LF",
-    "skipEmptyTreeDiff": true
+    "skipEmptyTreeDiff": true,
+    "minReplayAgeMinutes": 5
   },
-  "pollIntervalMinutes": 5,
+  "pollIntervalMinutes": 60,
   "commitMessagePrefix": true
 }

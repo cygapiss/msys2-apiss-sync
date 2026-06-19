@@ -1,4 +1,4 @@
-# Agent guide: msys-uwp-sync
+# Agent guide: msys2-uwp-sync
 
 This repository builds cross-platform PowerShell tooling to replay upstream
 MSYS2 package history into `msys2-uwp/msys2-uwp`.
@@ -14,7 +14,7 @@ MSYS2 package history into `msys2-uwp/msys2-uwp`.
 - **Destination**: `msys2-uwp/msys2-uwp`, branch `upstream`
 - **Base commit**: `6fc20894663468a04dd4986a8b1c15a9d5ae8649` (parent of first replayed commit)
 - **Strategy**: deterministic date-ordered replay; same SHAs on every rebuild at same pins
-- **Triggers**: GitHub Actions every 5 minutes (poll upstream SHAs) + daily reconciliation
+- **Triggers**: mirror push -> `repository_dispatch` (~1-5 min); hourly poll + daily reconciliation as fallback
 - **Runtime**: PowerShell 7+ (`pwsh`); scripts must work on Windows, Linux, and macOS
 - **State**: `.sync/state.json` tracks cursors and manifest (verify/rebuild)
 

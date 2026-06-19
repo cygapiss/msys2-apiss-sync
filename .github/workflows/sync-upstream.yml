@@ -1,8 +1,13 @@
 name: Sync upstream
 
 on:
+  repository_dispatch:
+    types:
+      - upstream-updated
+      - msys2-packages-updated
+      - mingw-packages-updated
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 * * * *'
     - cron: '0 3 * * *'
   workflow_dispatch:
 
@@ -17,6 +22,12 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Log trigger
+        run: |
+          echo "event=${{ github.event_name }}"
+          echo "dispatch_type=${{ github.event.action }}"
+          echo "client_payload=${{ toJson(github.event.client_payload) }}"
+
       - name: Checkout sync repo
         uses: actions/checkout@v4
         with:

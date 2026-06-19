@@ -14,7 +14,9 @@ param(
     [switch] $SkipFetch,
     [switch] $Force,
     [switch] $PushDestination,
-    [switch] $PushState
+    [switch] $PushState,
+    [switch] $SkipMetadataValidation,
+    [switch] $RefreshLogs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,7 +39,9 @@ try {
         -MaxCommits $MaxCommits `
         -DryRun:$DryRun `
         -SkipFetch:$SkipFetch `
-        -Force:$Force
+        -Force:$Force `
+        -SkipMetadataValidation:$SkipMetadataValidation `
+        -RefreshLogs:$RefreshLogs
 
     if ($result.Skipped) {
         exit 0

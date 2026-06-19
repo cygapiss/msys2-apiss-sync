@@ -10,8 +10,17 @@ alwaysApply: false
 
 | File | Purpose |
 |------|---------|
-| `sync-upstream.yml` | Incremental sync: `*/5` cron, daily cron, `workflow_dispatch` |
+| `sync-upstream.yml` | Incremental sync: `repository_dispatch`, hourly cron, daily cron, manual |
 | `sync-bootstrap.yml` | Manual full history replay only |
+
+## Mirror repos (separate repositories)
+
+| Mirror | Upstream |
+|--------|----------|
+| `msys2-uwp/MSYS2-packages-mirror` | `msys2/MSYS2-packages` |
+| `msys2-uwp/MINGW-packages-mirror` | `msys2/MINGW-packages` |
+
+Templates: `docs/examples/mirror-sync.yml`, `docs/examples/mirror-dispatch.yml`.
 
 ## Runner
 
@@ -28,7 +37,8 @@ concurrency:
 
 ## Secrets
 
-- `MSYS2_UWP_SYNC_TOKEN`: write access to `msys2-uwp/msys2-uwp`
+- `MSYS2_UWP_SYNC_TOKEN`: write access to `msys2-uwp/msys2-uwp` and this repo
+- `SYNC_DISPATCH_TOKEN`: mirror repos only; dispatch `msys2-uwp-sync`
 - Never log tokens; pass via `env:` to script steps only.
 
 ## Push policy

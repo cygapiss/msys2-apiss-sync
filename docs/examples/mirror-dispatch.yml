@@ -1,0 +1,30 @@
+name: Dispatch sync on mirror push
+
+# Install this workflow in each mirror repo under msys2-uwp/.
+# Copy to: .github/workflows/mirror-dispatch.yml
+# Requires secret SYNC_DISPATCH_TOKEN (repo scope, can dispatch msys2-uwp-sync).
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify msys2-uwp-sync
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.SYNC_DISPATCH_TOKEN }}
+          repository: msys2-uwp/msys2-uwp-sync
+          event-type: upstream-updated
+          client-payload: >-
+            {
+              "source": "${{ github.repository }}",
+              "sha": "${{ github.sha }}",
+              "ref": "${{ github.ref }}"
+            }

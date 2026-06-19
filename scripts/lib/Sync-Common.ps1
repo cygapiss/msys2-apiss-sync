@@ -209,6 +209,82 @@ function Invoke-GitText {
     return $stdout
 }
 
+function ConvertTo-Base64Utf8 {
+    param([AllowNull()][string] $Text)
+    if ($null -eq $Text -or $Text.Length -eq 0) {
+        return ''
+    }
+    return [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Text))
+}
+
+function ConvertFrom-Base64Utf8 {
+    param([AllowNull()][string] $Encoded)
+    if ($null -eq $Encoded -or $Encoded.Length -eq 0) {
+        return ''
+    }
+    return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Encoded))
+}
+
+function Write-JsonString {
+    param(
+        [Parameter(Mandatory)][System.IO.StreamWriter] $Writer,
+        [AllowNull()][string] $Value
+    )
+
+    if ($null -eq $Value) {
+        $Writer.Write('null')
+        return
+    }
+
+    $Writer.Write('"')
+    foreach ($ch in $Value.ToCharArray()) {
+        switch ($ch) {
+            '"' { $Writer.Write('\"') }
+            '\' { $Writer.Write('\\') }
+            { [int][char]$ch -lt 0x20 } { $Writer.Write('\u{0:x4}' -f [int][char]$ch) }
+            default { $Writer.Write($ch) }
+        }
+    }
+    $Writer.Write('"')
+}
+
+function Get-CommitMetadataFromStoredEntry {
+    param([Parameter(Mandatory)] $Entry)
+
+    if ($null -ne $Entry.PSObject.Properties['AuthorName']) {
+        return [pscustomobject]@{
+            AuthorName = $Entry.AuthorName
+            AuthorEmail = $Entry.AuthorEmail
+            AuthorDate = [int64]$Entry.AuthorDate
+            Subject = $Entry.Subject
+            Body = if ($Entry.Body) { $Entry.Body } else { '' }
+        }
+    }
+
+    return [pscustomobject]@{
+        AuthorName = ConvertFrom-Base64Utf8 -Encoded $Entry.AuthorNameB64
+        AuthorEmail = ConvertFrom-Base64Utf8 -Encoded $Entry.AuthorEmailB64
+        AuthorDate = [int64]$Entry.AuthorDate
+        Subject = ConvertFrom-Base64Utf8 -Encoded $Entry.SubjectB64
+        Body = ConvertFrom-Base64Utf8 -Encoded $Entry.BodyB64
+    }
+}
+
+function Get-StoredEntryTextB64 {
+    param(
+        [Parameter(Mandatory)] $Entry,
+        [Parameter(Mandatory)][string] $PlainProperty,
+        [Parameter(Mandatory)][string] $B64Property
+    )
+
+    if ($null -ne $Entry.PSObject.Properties[$B64Property] -and $Entry.$B64Property) {
+        return $Entry.$B64Property
+    }
+
+    $plain = if ($null -ne $Entry.PSObject.Properties[$PlainProperty]) { $Entry.$PlainProperty } else { '' }
+    return ConvertTo-Base64Utf8 -Text $plain
+}
+
 function Parse-GitCommitObject {
     param(
         [Parameter(Mandatory)]
@@ -221,8 +297,8 @@ function Parse-GitCommitObject {
     $authorDate = 0
 
     foreach ($line in ($raw -split "`n")) {
-        if ($line -match '^author (.+) <([^>]+)> (\d+) ') {
-            $authorName = $Matches[1]
+        if ($line -match '^author (.+?) <([^>]*)> (\d+) ') {
+            $authorName = $Matches[1].Trim()
             $authorEmail = $Matches[2]
             $authorDate = [int64]$Matches[3]
             break
@@ -230,7 +306,8 @@ function Parse-GitCommitObject {
     }
 
     if (-not $authorName) {
-        throw 'Could not parse author from git commit object.'
+        $preview = ($raw -split "`n" | Select-Object -First 6) -join '; '
+        throw "Could not parse author from git commit object. Header: $preview"
     }
 
     $blankIdx = $raw.IndexOf("`n`n")

@@ -29,12 +29,13 @@ Do not rewrite the base commit from sync tooling.
 - Use normalized commit message template from `docs/PLAN.md` (Deterministic replay).
 - Do not use wholesale `git merge` of upstream repos.
 - Incremental runs must match append order of a full rebuild at same upstream tips.
+- Incremental only: skip commits with author date within `minReplayAgeMinutes` (default 5).
 - Track progress in this repo's `.sync/state.json` (cursors + manifest).
 
 ## Triggers
 
-- Poll upstream every 5 minutes via GitHub Actions (we cannot webhook upstream).
-- Daily reconciliation cron; manual `workflow_dispatch` for bootstrap.
+- Primary: mirror repos dispatch on push (~1-5 min after upstream).
+- Fallback: hourly poll + daily reconciliation in `sync-upstream.yml`.
 
 ## References
 

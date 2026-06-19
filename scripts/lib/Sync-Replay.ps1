@@ -5,6 +5,7 @@
 . "$PSScriptRoot/Sync-State.ps1"
 . "$PSScriptRoot/Sync-GitHub.ps1"
 . "$PSScriptRoot/Sync-Git.ps1"
+. "$PSScriptRoot/Sync-Validate.ps1"
 
 function Start-ReplaySync {
     param(
@@ -16,7 +17,9 @@ function Start-ReplaySync {
         [int] $MaxCommits = 0,
         [switch] $DryRun,
         [switch] $SkipFetch,
-        [switch] $Force
+        [switch] $Force,
+        [switch] $SkipMetadataValidation,
+        [switch] $RefreshLogs
     )
 
     $config = Get-SyncConfig -RepoRoot $RepoRoot
@@ -32,6 +35,32 @@ function Start-ReplaySync {
             -SourceId $prop.Name `
             -SourceEntry $prop.Value `
             -SkipFetch:$SkipFetch
+    }
+
+    $built = Build-ReplayCommitQueue `
+        -Config $config `
+        -State $state `
+        -Mirrors $mirrors `
+        -RepoRoot $RepoRoot `
+        -Mode $Mode `
+        -Force:$Force `
+        -MaxCommits $MaxCommits `
+        -RefreshLogs:$RefreshLogs
+
+    if ($built.SkippedNoChanges) {
+        Write-SyncLog 'No upstream changes detected; skipping replay.'
+        return [pscustomobject]@{
+            CommitsReplayed = 0
+            Skipped = $true
+            DestinationPath = $null
+            BranchName = $branch
+            UpstreamTips = $built.UpstreamTips
+        }
+    }
+
+    if (-not $SkipMetadataValidation -and $built.Queue.Count -gt 0) {
+        $queuePath = Get-ReplayQueueJsonPath -RepoRoot $RepoRoot
+        $null = Test-ReplayQueueFromJson -QueuePath $queuePath -Mirrors $mirrors
     }
 
     $destPath = Initialize-DestinationRepository `
@@ -65,64 +94,8 @@ function Start-ReplaySync {
         }
     }
 
-    $upstreamTips = @{}
-    $queue = @()
-
-    foreach ($prop in $config.sources.PSObject.Properties) {
-        $sourceId = $prop.Name
-        $sourceEntry = $prop.Value
-        $mirrorPath = $mirrors[$sourceId]
-        $branchRef = "refs/heads/$($sourceEntry.branch)"
-        $tip = (Invoke-Git -RepoPath $mirrorPath -GitArgs @('rev-parse', $branchRef)).ToString().Trim()
-        $upstreamTips[$sourceId] = $tip
-
-        $afterSha = if ($resetBranch) { $null } else { Get-SourceCursor -State $state -SourceId $sourceId }
-        if ($afterSha) {
-            $null = Test-CommitExists -RepoPath $mirrorPath -Sha $afterSha
-        }
-
-        $entries = Get-UpstreamCommitEntries -MirrorPath $mirrorPath -Branch $tip -AfterSha $afterSha -UntilSha $tip
-        foreach ($entry in $entries) {
-            $queue += [pscustomobject]@{
-                SourceId = $sourceId
-                SortKey = $sourceEntry.sortKey
-                DestSubdir = $sourceEntry.destSubdir
-                UpstreamRepo = Get-SourceRepoSlug -SourceEntry $sourceEntry
-                MirrorPath = $mirrorPath
-                Sha = $entry.Sha
-                AuthorDate = $entry.AuthorDate
-                CommitterDate = $entry.CommitterDate
-            }
-        }
-    }
-
-    if ($Mode -eq 'Incremental' -and -not $Force) {
-        $currentTips = Get-AllUpstreamTips -Config $config
-        if (-not (Test-UpstreamChanged -State $state -CurrentTips $currentTips) -and $queue.Count -eq 0) {
-            Write-SyncLog 'No upstream changes detected; skipping replay.'
-            return [pscustomobject]@{
-                CommitsReplayed = 0
-                Skipped = $true
-                DestinationPath = $destPath
-                BranchName = $branch
-                UpstreamTips = $upstreamTips
-            }
-        }
-    }
-
-    $queue = @(Sort-ReplayCommitQueue -Queue $queue)
-
-    if ($Mode -eq 'Incremental') {
-        $beforeAge = $queue.Count
-        $queue = @(Filter-ReplayQueueByAge -Queue $queue -Config $config)
-        if ($beforeAge -gt 0 -and $queue.Count -eq 0) {
-            Write-SyncLog 'Pending upstream commits exist but all are within the replay age window; waiting.'
-        }
-    }
-
-    if ($MaxCommits -gt 0 -and $queue.Count -gt $MaxCommits) {
-        $queue = $queue[0..($MaxCommits - 1)]
-    }
+    $queue = $built.Queue
+    $upstreamTips = $built.UpstreamTips
 
     Write-SyncLog "Replay mode=$Mode branch=$branch pending=$($queue.Count) commits"
 
@@ -134,12 +107,24 @@ function Start-ReplaySync {
     foreach ($item in $queue) {
         $index++
         $parent = Get-FirstParent -MirrorPath $item.MirrorPath -Commit $item.Sha
-        $metadata = Get-CommitMetadata -MirrorPath $item.MirrorPath -Commit $item.Sha
-        $message = Format-ReplayCommitMessage `
-            -SortKey $item.SortKey `
-            -Metadata $metadata `
-            -UpstreamRepo $item.UpstreamRepo `
-            -UpstreamSha $item.Sha
+        if ($item.Metadata) {
+            $metadata = $item.Metadata
+            $message = if ($item.ReplayMessage) { $item.ReplayMessage } else {
+                Format-ReplayCommitMessage `
+                    -SortKey $item.SortKey `
+                    -Metadata $metadata `
+                    -UpstreamRepo $item.UpstreamRepo `
+                    -UpstreamSha $item.Sha
+            }
+        }
+        else {
+            $metadata = Get-CommitMetadata -MirrorPath $item.MirrorPath -Commit $item.Sha
+            $message = Format-ReplayCommitMessage `
+                -SortKey $item.SortKey `
+                -Metadata $metadata `
+                -UpstreamRepo $item.UpstreamRepo `
+                -UpstreamSha $item.Sha
+        }
 
         $hasChanges = Apply-UpstreamCommitToIndex `
             -MirrorPath $item.MirrorPath `
@@ -169,6 +154,10 @@ function Start-ReplaySync {
                 Save-SyncState -RepoRoot $RepoRoot -State $state
             }
         }
+    }
+
+    if ($replayed -gt 0 -and -not $DryRun) {
+        $null = Invoke-Git -RepoPath $destPath -GitArgs @('reset', '--hard', 'HEAD')
     }
 
     $tipSha = Get-DestinationBranchTip -DestinationPath $destPath -BranchName $branch

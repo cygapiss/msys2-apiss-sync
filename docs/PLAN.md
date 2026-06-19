@@ -7,8 +7,8 @@ and [msys2/MSYS2-packages](https://github.com/msys2/MSYS2-packages) into
 ## Goals
 
 - Cross-platform PowerShell 7 (`pwsh`) scripts runnable locally and in CI.
-- Incremental sync triggered within ~5 minutes of upstream activity.
-- Daily reconciliation so no commit is missed.
+- Incremental sync triggered within ~1-5 minutes of upstream activity (mirror + dispatch).
+- Hourly poll as tolerance fallback so nothing is missed.
 - Auto-push results to `msys2-uwp/msys2-uwp`.
 - Preserve original commit dates when replaying history one commit at a time.
 - **Deterministic replay**: re-running a full rebuild from the same upstream
@@ -24,8 +24,10 @@ and [msys2/MSYS2-packages](https://github.com/msys2/MSYS2-packages) into
 
 | Repository | Role |
 |------------|------|
-| `msys-uwp/msys-uwp-sync` (this repo) | PowerShell sync engine, config, sync state, GitHub Actions |
+| `msys2-uwp/msys2-uwp-sync` (this repo) | PowerShell sync engine, config, sync state, GitHub Actions |
 | `msys2-uwp/msys2-uwp` | Destination monorepo; branch `upstream` holds replayed history only |
+| `msys2-uwp/MSYS2-packages-mirror` | Fast mirror of `msys2/MSYS2-packages`; dispatches on push |
+| `msys2-uwp/MINGW-packages-mirror` | Fast mirror of `msys2/MINGW-packages`; dispatches on push |
 
 ## Destination layout (branch `upstream`)
 
@@ -108,6 +110,11 @@ Incremental sync uses the **same sort** over the pending slice only. Because
 replay is strictly append-only and cursors record upstream SHAs, incremental
 runs must match what a full rebuild would have produced at the same upstream
 tips.
+
+**Replay age gate (incremental only):** commits with author date newer than
+`replay.minReplayAgeMinutes` (default 5, matches poll interval) are held back.
+This avoids replaying very fresh upstream commits before the cross-repo timeline
+stabilizes. Bootstrap, rebuild, and verify replay all history regardless of age.
 
 ### Commit metadata (fixed for SHA stability)
 
@@ -207,45 +214,115 @@ If `msys2/*` force-pushes, pinned SHAs may disappear. Recovery:
 Bootstrap for ~69k combined commits may take hours. Run once with progress
 logging; incremental runs should finish in minutes.
 
-## Trigger model (5-minute push awareness)
+## Trigger model (mirror + dispatch, hourly poll tolerance)
 
-We cannot install push webhooks on `msys2/*` repos. Use **poll + debounce**:
+We cannot install webhooks or workflows on upstream `msys2/*` repos. Use **owned
+mirror repos** for near-push triggers, plus **hourly poll** as a safety net.
 
 ```mermaid
-flowchart LR
-  subgraph triggers [Triggers]
-    CRON["schedule: */5 * * * *"]
-    DAILY["schedule: 0 3 * * *"]
-    MANUAL["workflow_dispatch"]
+flowchart TB
+  subgraph upstream [Upstream read-only]
+    UP1["msys2/MSYS2-packages"]
+    UP2["msys2/MINGW-packages"]
   end
 
-  subgraph sync_repo [msys-uwp-sync Actions]
-    CHECK["Check upstream SHAs via GitHub API"]
-    DEBOUNCE["Skip if run in last 5 min and SHA unchanged"]
-    RUN["Invoke Sync-Upstream.ps1"]
+  subgraph mirrors [msys2-uwp mirrors]
+    M1["MSYS2-packages-mirror"]
+    M2["MINGW-packages-mirror"]
+    MSYNC["mirror sync every 1-5 min"]
+  end
+
+  subgraph sync_repo [msys2-uwp-sync]
+    DISP["repository_dispatch"]
+    POLL["schedule: hourly + daily"]
+    RUN["Sync-Incremental.ps1"]
   end
 
   subgraph dest [msys2-uwp/msys2-uwp]
-    PUSH["Push branch upstream"]
+    PUSH["push upstream branch"]
   end
 
-  CRON --> CHECK
-  DAILY --> CHECK
-  MANUAL --> CHECK
-  CHECK --> DEBOUNCE --> RUN --> PUSH
+  UP1 --> MSYNC --> M1
+  UP2 --> MSYNC --> M2
+  M1 -->|push| DISP
+  M2 -->|push| DISP
+  POLL --> RUN
+  DISP --> RUN
+  RUN --> PUSH
 ```
 
-**5-minute window**: scheduled workflow every 5 minutes compares upstream
-`master` SHAs to `lastUpstreamCheck` in this repo's `.sync/state.json`. If
-either SHA changed since last successful sync, run incremental replay. Use
-GitHub Actions `concurrency` to cancel in-progress runs when a newer trigger
-arrives (debounce overlapping work).
+### Primary: mirror + repository_dispatch (~1-5 min)
 
-**Daily job**: at 03:00 UTC, force-fetch and verify cursor matches upstream
-tips; replay any gap commits.
+Two mirror repos under `msys2-uwp`, each tracking upstream `master`:
 
-Optional later: mirror upstream repos under `msys2-uwp` and use
-`repository_dispatch` from those mirrors for true push-driven triggers.
+| Mirror repo | Upstream source |
+|-------------|-----------------|
+| `msys2-uwp/MSYS2-packages-mirror` | `msys2/MSYS2-packages` |
+| `msys2-uwp/MINGW-packages-mirror` | `msys2/MINGW-packages` |
+
+**Mirror sync workflow** (in each mirror repo, every 1-5 minutes):
+
+1. `git fetch` from upstream `msys2/*`
+2. Fast-forward mirror `master` if upstream moved
+3. On push to mirror `master`, send `repository_dispatch` to `msys2-uwp-sync`
+
+**Sync workflow** (`sync-upstream.yml` in this repo) listens for:
+
+```yaml
+on:
+  repository_dispatch:
+    types:
+      - upstream-updated
+      - msys2-packages-updated
+      - mingw-packages-updated
+```
+
+Typical latency: mirror sync interval (1-5 min) + dispatch + replay run.
+
+Example mirror workflows: [docs/examples/mirror-sync.yml](examples/mirror-sync.yml),
+[docs/examples/mirror-dispatch.yml](examples/mirror-dispatch.yml).
+
+### Tolerance: hourly poll + daily reconciliation
+
+Scheduled poll is a **fallback**, not the primary trigger:
+
+| Schedule | Cron | Purpose |
+|----------|------|---------|
+| Hourly | `0 * * * *` | Catch missed dispatches (mirror down, token expiry, etc.) |
+| Daily | `0 3 * * *` | Full gap check against upstream tips |
+
+`pollIntervalMinutes` in `config/sync.json` is **60** (matches hourly poll).
+
+Compare upstream `master` SHAs to `lastUpstreamCheck` in `.sync/state.json`.
+If either SHA changed, run incremental replay. Use GitHub Actions `concurrency`
+to cancel in-progress runs when a newer trigger arrives.
+
+### Replay age gate (timeline stability)
+
+Independent of trigger type: incremental replay only applies commits whose
+**author date** is at least `replay.minReplayAgeMinutes` old (default 5). This
+prevents cross-repo timeline reorder when fresh commits arrive close together.
+See **Deterministic replay** above.
+
+### Secrets (mirror + sync)
+
+| Secret | Where | Purpose |
+|--------|-------|---------|
+| `MSYS2_UWP_SYNC_TOKEN` | `msys2-uwp-sync` | Write to `msys2-uwp/msys2-uwp`; commit `.sync/state.json` |
+| `SYNC_DISPATCH_TOKEN` | Both mirror repos | PAT with `repo` scope to dispatch `msys2-uwp-sync` workflows |
+
+`SYNC_DISPATCH_TOKEN` needs permission to call
+[`repository_dispatch`](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event)
+on `msys2-uwp/msys2-uwp-sync`. Can be the same PAT as `MSYS2_UWP_SYNC_TOKEN`
+if org policy allows one shared bot token.
+
+### Setup checklist (mirror phase)
+
+1. Create `msys2-uwp/MSYS2-packages-mirror` and `msys2-uwp/MINGW-packages-mirror`.
+2. Add mirror sync + dispatch workflows from `docs/examples/`.
+3. Store `SYNC_DISPATCH_TOKEN` in both mirror repos.
+4. Enable `repository_dispatch` trigger in `sync-upstream.yml` (done).
+5. Keep hourly + daily cron as tolerance fallback.
 
 ## PowerShell script layout
 
@@ -265,8 +342,12 @@ config/
   sync.json               # Default config (overridable by env)
 .github/
   workflows/
-    sync-upstream.yml     # Scheduled + manual sync
+    sync-upstream.yml     # dispatch + hourly/daily poll + manual
     sync-bootstrap.yml    # Manual-only long bootstrap
+docs/
+  examples/
+    mirror-sync.yml       # Template: mirror repo fast-forward from upstream
+    mirror-dispatch.yml   # Template: dispatch sync on mirror push
 ```
 
 All scripts target **PowerShell 7+** (`#requires -Version 7.0`) and use only
@@ -276,11 +357,15 @@ cmdlets plus `git` / `gh` on PATH (no Windows-only APIs).
 
 ### `sync-upstream.yml`
 
-- **Triggers**: `schedule: '*/5 * * * *'`, `cron: '0 3 * * *'`, `workflow_dispatch`
+- **Triggers**:
+  - `repository_dispatch`: `upstream-updated`, `msys2-packages-updated`, `mingw-packages-updated`
+  - `schedule: '0 * * * *'` (hourly tolerance poll)
+  - `schedule: '0 3 * * *'` (daily reconciliation)
+  - `workflow_dispatch`
 - **Runner**: `ubuntu-latest` with `pwsh` (or `windows-latest`; prefer Ubuntu for git performance)
 - **Concurrency**: `group: sync-upstream`, `cancel-in-progress: true`
 - **Steps**:
-  1. Checkout `msys-uwp-sync`
+  1. Checkout `msys2-uwp-sync`
   2. Install/verify `git`, `pwsh`, `gh`
   3. Clone `msys2-uwp/msys2-uwp` with credentials
   4. Run `scripts/Sync-Upstream.ps1 -Mode Incremental`
@@ -306,13 +391,14 @@ cmdlets plus `git` / `gh` on PATH (no Windows-only APIs).
 
 | Secret | Purpose |
 |--------|---------|
-| `MSYS2_UWP_SYNC_TOKEN` | PAT or GitHub App token with `contents: write` on `msys2-uwp/msys2-uwp` |
+| `MSYS2_UWP_SYNC_TOKEN` | PAT or GitHub App token with `contents: write` on `msys2-uwp/msys2-uwp` and this repo |
+| `SYNC_DISPATCH_TOKEN` | PAT for mirror repos to dispatch `msys2-uwp-sync` (see mirror phase above) |
 
 `GITHUB_TOKEN` in this repo is sufficient for reading public upstream repos.
 
 ## State file (`.sync/state.json` in this repo)
 
-Lives at the root of **msys-uwp-sync**, committed to git. It is the sync
+Lives at the root of **msys2-uwp-sync**, committed to git. It is the sync
 engine's checkpoint file, not part of the destination tree.
 
 **What it tracks:**
@@ -407,10 +493,18 @@ vary format between bootstrap, incremental, and rebuild runs.
 
 ### Phase 3 - GitHub Actions
 
-- [x] `sync-upstream.yml` (5-min + daily)
+- [x] `sync-upstream.yml` (dispatch + hourly/daily poll + manual)
 - [x] `sync-bootstrap.yml` (manual)
 - [x] `sync-rebuild.yml`, `sync-verify.yml` (manual + weekly verify)
 - [ ] Wire secrets in `msys2-uwp` org
+
+### Phase 3.5 - Mirror repos + dispatch
+
+- [ ] Create `msys2-uwp/MSYS2-packages-mirror` and `msys2-uwp/MINGW-packages-mirror`
+- [ ] Deploy `docs/examples/mirror-sync.yml` (upstream fast-forward every 5 min)
+- [ ] Deploy `docs/examples/mirror-dispatch.yml` (dispatch on mirror push)
+- [ ] Store `SYNC_DISPATCH_TOKEN` in both mirror repos
+- [ ] Verify end-to-end: upstream push -> mirror -> dispatch -> replay (~1-5 min)
 
 ### Phase 4 - Initial bootstrap
 
@@ -423,13 +517,14 @@ vary format between bootstrap, incremental, and rebuild runs.
 1. **Bootstrap location**: local machine vs self-hosted runner (large clone/time).
 2. **Default branch on `msys2-uwp`**: keep `main` empty until UWP work starts, or make `upstream` default?
 3. **Weekly verify schedule**: day/time for `sync-verify.yml` cron.
+4. **Mirror sync interval**: 1 min vs 5 min (trade GitHub Actions minutes vs latency).
 
 ## Local development
 
 ```powershell
 # Clone both repos
-git clone https://github.com/lygstate/msys-uwp-sync  # adjust remote
-cd msys-uwp-sync
+git clone https://github.com/msys2-uwp/msys2-uwp-sync.git  # adjust remote
+cd msys2-uwp-sync
 
 # Dry run (no push)
 ./scripts/Sync-Upstream.ps1 -Mode Incremental -DestinationPath ../msys2-uwp -DryRun
