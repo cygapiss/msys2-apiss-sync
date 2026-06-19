@@ -1,6 +1,6 @@
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 import type { SyncLogger } from './log.ts';
 
@@ -43,6 +43,40 @@ export function runGit(
 
 export function runGitText(repoPath: string | null, gitArgs: string[]): string {
   return runGitInternal(repoPath, gitArgs, undefined, {}, 1);
+}
+
+export function streamGitText(repoPath: string | null, gitArgs: string[], env: GitEnv = {}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const args = repoPath ? ['-C', repoPath, ...gitArgs] : gitArgs;
+    const child = spawn('git', args, {
+      env: { ...process.env, ...env },
+      windowsHide: true
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout.push(chunk);
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr.push(chunk);
+    });
+    child.on('error', (error) => {
+      reject(error);
+    });
+    child.on('close', (code) => {
+      const stdoutText = Buffer.concat(stdout).toString('utf8');
+      const stderrText = Buffer.concat(stderr).toString('utf8');
+      if (code === 0) {
+        resolve(stdoutText || stderrText);
+        return;
+      }
+
+      const command = repoPath ? `git -C ${repoPath} ${gitArgs.join(' ')}` : `git ${gitArgs.join(' ')}`;
+      const output = (stderrText || stdoutText).trim();
+      reject(new Error(`git command failed (${command}): ${output}`));
+    });
+  });
 }
 
 export function runGitStdin(

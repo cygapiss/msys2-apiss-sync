@@ -41,8 +41,10 @@ async function main(): Promise<void> {
 
     const tipPorts = getMirrorTipSha(mirrorPorts, config.Sources.Ports.Branch);
     const tipMingw = getMirrorTipSha(mirrorMingw, config.Sources.PortsMingw.Branch);
-    const portsList = getSourceReplayHistory('Ports', config, mirrorPorts, afterSha, tipPorts);
-    const mingwList = getSourceReplayHistory('PortsMingw', config, mirrorMingw, afterSha, tipMingw);
+    const [portsList, mingwList] = await Promise.all([
+      getSourceReplayHistory('Ports', config, mirrorPorts, afterSha, tipPorts),
+      getSourceReplayHistory('PortsMingw', config, mirrorMingw, afterSha, tipMingw)
+    ]);
     const queue = mergeReplayCommitQueues(portsList, mingwList);
 
     logger.write(`ports: ${portsList.length}  mingw: ${mingwList.length}  merged: ${queue.length}`);

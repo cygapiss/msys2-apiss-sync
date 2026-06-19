@@ -121,8 +121,10 @@ async function main(): Promise<void> {
 
     const tipPorts = getMirrorTipSha(mirrorPorts, config.Sources.Ports.Branch);
     const tipMingw = getMirrorTipSha(mirrorMingw, config.Sources.PortsMingw.Branch);
-    const portsList = getSourceReplayHistory('Ports', config, mirrorPorts, cursorPorts, tipPorts);
-    const mingwList = getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursorMingw, tipMingw);
+    const [portsList, mingwList] = await Promise.all([
+      getSourceReplayHistory('Ports', config, mirrorPorts, cursorPorts, tipPorts),
+      getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursorMingw, tipMingw)
+    ]);
     let queue = mergeReplayCommitQueues(portsList, mingwList);
 
     logger.write(`Retrieved ports=${portsList.length} mingw=${mingwList.length} merged=${queue.length}`);

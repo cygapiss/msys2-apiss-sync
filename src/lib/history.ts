@@ -1,7 +1,7 @@
 import type { ParsedCommitObject, ReplayEntry, SourceKey, UpstreamLogEntry } from '../types/replay-entry.ts';
 import { getSourceConfigEntry, getSourceRepoSlug, type SyncConfig } from './config.ts';
 import { convertToUnixLineEndings, splitCommitMessage } from './log.ts';
-import { runGitText } from './git.ts';
+import { runGitText, streamGitText } from './git.ts';
 
 export function getUpstreamCommitLogMetadataFormat(): string {
   return '%H%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%B%x1e';
@@ -47,14 +47,14 @@ export function convertFromUpstreamCommitLogMetadataText(text: string): Upstream
   return entries;
 }
 
-export function exportUpstreamCommitLogRawText(
+export async function exportUpstreamCommitLogRawText(
   mirrorPath: string,
   afterSha: string | null,
   untilSha: string,
   branch = 'master'
-): string {
+): Promise<string> {
   const range = afterSha ? `${afterSha}..${untilSha}` : untilSha;
-  const text = runGitText(mirrorPath, ['log', '--reverse', `--format=${getUpstreamCommitLogMetadataFormat()}`, range]);
+  const text = await streamGitText(mirrorPath, ['log', '--reverse', `--format=${getUpstreamCommitLogMetadataFormat()}`, range]);
   return convertToUnixLineEndings(text).trim();
 }
 
@@ -81,15 +81,15 @@ export function newReplayCommitEntry(sourceId: SourceKey, logEntry: UpstreamLogE
   };
 }
 
-export function getSourceReplayHistory(
+export async function getSourceReplayHistory(
   sourceKey: SourceKey,
   config: SyncConfig,
   mirrorPath: string,
   afterSha: string | null,
   untilSha: string
-): ReplayEntry[] {
+): Promise<ReplayEntry[]> {
   const sourceEntry = getSourceConfigEntry(config, sourceKey);
-  const text = exportUpstreamCommitLogRawText(mirrorPath, afterSha, untilSha, sourceEntry.Branch);
+  const text = await exportUpstreamCommitLogRawText(mirrorPath, afterSha, untilSha, sourceEntry.Branch);
   return convertFromUpstreamCommitLogMetadataText(text).map((entry) => newReplayCommitEntry(sourceKey, entry, config));
 }
 

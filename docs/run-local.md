@@ -47,13 +47,13 @@ npm run sync -- --skip-fetch --max-commits 10 --destination-path .work/destinati
 Log to a file only (`--log-file` suppresses console `[sync]` info lines; warnings/errors
 still print). Each run truncates the log unless you pass `--log-append`.
 
-Option A ¡ª close `out.txt` in the editor, then:
+Option A - close `out.txt` in the editor, then:
 
 ```bash
 npm run sync -- --dry-run --skip-fetch --log-file out.txt
 ```
 
-Option B ¡ª log to a path the editor is not holding open:
+Option B - log to a path the editor is not holding open:
 
 ```bash
 npm run sync -- --dry-run --skip-fetch --log-file .work/cache/replay-log/sync-dryrun.log

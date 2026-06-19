@@ -39,7 +39,7 @@ async function main(): Promise<void> {
       });
       const branch = config.Sources[key].Branch;
       const tip = getMirrorTipSha(mirrorPath, branch);
-      const history = getSourceReplayHistory(key, config, mirrorPath, afterSha, tip);
+      const history = await getSourceReplayHistory(key, config, mirrorPath, afterSha, tip);
       const sortKey = config.Sources[key].SortKey;
       const outFile = join(outDir, `history-${sortKey}.json`);
       const fullFile = saveFullJson ? join(outDir, `history-${sortKey}-full.json`) : null;
