@@ -1,5 +1,7 @@
 # minimal-and-safe-editing-check plan
 
+Encoding baseline: UTF-8 (no BOM preferred) for this and all plan files.
+
 Standalone reference behavior summary:
 
 | Area | Markdown normalizer behavior | Commit message normalizer behavior |
@@ -14,66 +16,100 @@ Standalone reference behavior summary:
 | Write mode | Rewrites only files requiring normalization | Rewrites only when normalization is needed |
 | Result reporting | Deterministic stale file list and summary | Clear normalized/already-clean status |
 
-Normalization rule expectations for this plan:
+GBK non-ASCII punctuation to ASCII mapping:
 
-| Input pattern | Output form |
-|---------------|-------------|
-| Em dash or en dash | `-` |
-| Unicode arrow or common mojibake arrow forms | `->` |
-| Unicode ellipsis or common mojibake ellipsis forms | `...` |
-| Smart quotes and NBSP variants | ASCII quote/space equivalents |
+| GBK/CP936 bytes | Symbol/meaning | ASCII output |
+|-----------------|----------------|--------------|
+| `A1 AA` | em dash | `-` |
+| `A8 43` | en dash | `-` |
+| `A1 AE`, `A1 AF` | single smart quotes | `'` |
+| `A1 B0`, `A1 B1` | double smart quotes | `"` |
+| `A1 AD` | ellipsis | `...` |
+| `A1 EB` | per mille sign | `%` |
+| `A1 FA` | right arrow | `->` |
+| `A1 FD` | down arrow | `v` |
 
-Full normalization symbol map (source-aligned):
+UTF-8 non-ASCII punctuation to ASCII mapping:
 
-| Input (Unicode/code point form) | Output |
-|----------------------------------|--------|
-| `U+2014` em dash | `-` |
-| `U+2013` en dash | `-` |
-| `U+2212` minus sign | `-` |
-| `U+2018`, `U+2019`, `U+201A`, `U+201B` | `'` |
-| `U+201C`, `U+201D`, `U+201E`, `U+201F` | `"` |
-| `U+2032` prime | `'` |
-| `U+2033` double prime | `"` |
-| `U+2026` ellipsis | `...` |
-| `U+00A0` no-break space | space |
-| `U+FEFF` BOM | removed |
-| `U+2192` right arrow | `->` |
-| `U+2194` left-right arrow | `<->` |
-| `U+2193` down arrow | `v` |
-| `U+25BA`, `U+25B6` right-pointing symbols | `>` |
-| `U+00A1 U+00AA` | `-` |
-| `U+00A1 U+00B0`, `U+00A1 U+00AF` | `'` |
-| `U+00A1 U+00C0`, `U+00A1 U+00B1` | `"` |
-| `U+00A1 U+00AD` | `...` |
-| `U+00A1 U+00FA` | `->` |
+| UTF-8 bytes | Symbol (code point) | ASCII output |
+|-------------|---------------------|--------------|
+| `E2 80 94` | em dash (`U+2014`) | `-` |
+| `E2 80 93` | en dash (`U+2013`) | `-` |
+| `E2 88 92` | minus sign (`U+2212`) | `-` |
+| `E2 80 98`, `E2 80 99` | single smart quotes (`U+2018`, `U+2019`) | `'` |
+| `E2 80 9C`, `E2 80 9D` | double smart quotes (`U+201C`, `U+201D`) | `"` |
+| `E2 80 A6` | ellipsis (`U+2026`) | `...` |
+| `E2 80 9A` | single low-9 quote (`U+201A`) | `'` |
+| `E2 80 9E` | double low-9 quote (`U+201E`) | `"` |
+| `C2 A0` | no-break space (`U+00A0`) | space |
+| `E2 80 A2` | bullet (`U+2022`) | `-` |
+| `E2 80 B9` | single left angle quote (`U+2039`) | `<` |
+| `E2 80 BA` | single right angle quote (`U+203A`) | `>` |
+| `E2 80 B0` | per mille sign (`U+2030`) | `%` |
+| `E2 86 92` | right arrow (`U+2192`) | `->` |
+| `E2 86 94` | left-right arrow (`U+2194`) | `<->` |
+| `E2 86 93` | down arrow (`U+2193`) | `v` |
+| `E2 96 BA` | right-pointing pointer (`U+25BA`) | `>` |
+| `E2 96 B6` | right-pointing triangle (`U+25B6`) | `>` |
+| `EF BB BF` (mid-file only) | UTF-8 BOM / `U+FEFF` appearing inside content | removed |
 
-Byte-level fix map used before/with decode:
+CP1252 non-ASCII punctuation to ASCII mapping:
 
-| Input bytes (hex) | Meaning/source pattern | Output bytes/text |
-|-------------------|------------------------|-------------------|
-| `E2 80 94` | UTF-8 em dash | `-` |
-| `E2 80 93` | UTF-8 en dash | `-` |
-| `E2 80 9C`, `E2 80 9D` | UTF-8 double smart quotes | `"` |
-| `E2 80 98`, `E2 80 99` | UTF-8 single smart quotes | `'` |
-| `E2 80 A6` | UTF-8 ellipsis | `...` |
-| `C2 A0` | UTF-8 NBSP | space |
-| `E2 80 3F` | truncated UTF-8 dash form | `-` |
-| `E2 86 3F` | truncated UTF-8 arrow form | `->` |
-| `A1 AA` | Latin-1 mojibake dash form | `-` |
-| `A1 B0`, `A1 AF` | Latin-1 mojibake single quote forms | `'` |
-| `A1 C0`, `A1 B1` | Latin-1 mojibake double quote forms | `"` |
-| `A1 AD` | Latin-1 mojibake ellipsis form | `...` |
-| `A1 FA` | Latin-1 mojibake arrow form | `->` |
-| `C2 A1 C2 AD` | UTF-8 mojibake ellipsis form | `...` |
-| `C2 A1 C3 BA` | UTF-8 mojibake arrow form | `->` |
-| `E2 86 92` | UTF-8 rightwards arrow | `->` |
-| `96`, `97` | CP1252 en/em dash in mixed files | `-` |
-| `32 A8 43` (`2\xa8C`) | repo-specific byte pattern | `2-` |
+| CP1252 bytes | Symbol/meaning | ASCII output |
+|--------------|----------------|--------------|
+| `96` | en dash | `-` |
+| `97` | em dash | `-` |
+| `91`, `92` | single smart quotes | `'` |
+| `93`, `94` | double smart quotes | `"` |
+| `82` | single low-9 quote | `'` |
+| `84` | double low-9 quote | `"` |
+| `85` | ellipsis | `...` |
+| `8B` | single left angle quote | `<` |
+| `9B` | single right angle quote | `>` |
+| `95` | bullet | `-` |
+| `89` | per mille sign | `%` |
 
 Implementation expectations:
 
-- Provide `--check` mode for CI/guard use (no writes; non-zero on violations)
-- Provide write mode for optional one-shot normalization
-- Enforce strict UTF-8 decode and ASCII punctuation normalization
-- Keep output deterministic and parseable
-- Keep scope minimal and support allowlist paths to avoid unrelated rewrites
+- Provide `--check` mode for CI/guard use (no writes; non-zero on violations).
+- Provide write mode for optional one-shot normalization.
+- Apply the three mapping tables above in deterministic order.
+- Decode input with strict UTF-8 first; if decode fails, apply configured fallback
+  decoding only for files in fallback scope.
+- Normalize line endings to LF and keep output in UTF-8 (no BOM).
+- Do not strip a file-leading UTF-8 BOM (first three bytes); only normalize
+  `U+FEFF` when it appears in the middle of content.
+- Emit parseable failures in `path:line:reason` format.
+- Keep scope minimal and support allowlist paths to avoid unrelated rewrites.
+- Treat Unicode `General_Category=P*` as candidate punctuation coverage; the three
+  tables above define the concrete normalization subset for this project.
+
+P* extension policy:
+
+| Case | Behavior in check mode | Behavior in write mode |
+|------|-------------------------|------------------------|
+| Punctuation in mapping tables | Report as fixable normalization | Rewrite to mapped ASCII output |
+| Punctuation in `P*` but not mapped | Report as unsupported punctuation candidate | Keep unchanged (no silent rewrite) |
+| Punctuation in allowlist | Ignore for failure purposes | Keep unchanged |
+
+Required test cases:
+
+| Test ID | Input type | Example input | Expected result |
+|---------|------------|---------------|-----------------|
+| `utf8-known-dash` | UTF-8 mapped punctuation | `U+2014`, `U+2013` | normalized to `-` |
+| `utf8-known-quotes` | UTF-8 mapped punctuation | `U+2018/U+2019`, `U+201C/U+201D` | normalized to `'` and `"` |
+| `utf8-known-ellipsis` | UTF-8 mapped punctuation | `U+2026` | normalized to `...` |
+| `utf8-known-arrow` | UTF-8 mapped punctuation | `U+2192`, `U+2194`, `U+2193` | normalized to `->`, `<->`, `v` |
+| `gbk-known-dash` | GBK fallback decode | bytes `A1 AA`, `A8 43` | normalized to `-` |
+| `gbk-known-quotes` | GBK fallback decode | bytes `A1 AE/A1 AF`, `A1 B0/A1 B1` | normalized to `'` and `"` |
+| `cp1252-known-dash` | CP1252 fallback decode | bytes `96`, `97` | normalized to `-` |
+| `cp1252-known-quotes` | CP1252 fallback decode | bytes `91/92`, `93/94`, `82`, `84` | normalized to `'` and `"` |
+| `cp1252-known-ellipsis` | CP1252 fallback decode | byte `85` | normalized to `...` |
+| `bom-leading-keep` | UTF-8 BOM boundary | BOM at file start only | preserved (not removed) |
+| `bom-mid-remove` | UTF-8 BOM boundary | `U+FEFF` in middle | removed |
+| `pstar-unmapped-check` | `P*` candidate coverage | punctuation not in mapping tables | check mode fails with `path:line:reason` |
+| `pstar-unmapped-write` | `P*` candidate coverage | punctuation not in mapping tables | unchanged, reported as unsupported |
+| `allowlist-unmapped` | allowlist behavior | unmapped punctuation in allowlisted path | no failure |
+| `deterministic-order` | output stability | same file set, repeated run | same diagnostics order and content |
+| `check-no-write` | mode contract | run with `--check` | no file content changes |
+| `write-idempotent` | mode contract | run write mode twice | second run reports no changes |
