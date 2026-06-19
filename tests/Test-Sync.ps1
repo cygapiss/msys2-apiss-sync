@@ -14,6 +14,7 @@ $tests = @(
     'ConvertFrom-UpstreamCommitLogMetadataText.Tests.ps1'
     'Merge-ReplayCommitQueues.Tests.ps1'
     'Format-GitReplayDateEnv.Tests.ps1'
+    'Format-ReplayCommitMessage.Tests.ps1'
 )
 
 foreach ($testName in $tests) {
