@@ -22,12 +22,12 @@ jobs:
     timeout-minutes: 720
     steps:
       - name: Checkout sync repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22.18.0'
           cache: yarn
