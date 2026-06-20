@@ -29,7 +29,12 @@ jobs:
             git remote set-url upstream "https://github.com/${UPSTREAM_REPO}.git"
           git fetch upstream master
           BEFORE="$(git rev-parse HEAD)"
-          git merge --ff-only upstream/master
+          if git merge --ff-only upstream/master; then
+            echo "Fast-forwarded mirror to upstream/master"
+          else
+            echo "Mirror diverged from upstream; resetting to upstream/master"
+            git reset --hard upstream/master
+          fi
           AFTER="$(git rev-parse HEAD)"
           if [ "$BEFORE" = "$AFTER" ]; then
             echo "No upstream changes."
@@ -38,4 +43,8 @@ jobs:
           fi
 
       - name: Push mirror
-        run: git push origin HEAD:master
+        run: |
+          if git push origin HEAD:master; then
+            exit 0
+          fi
+          git push --force-with-lease origin HEAD:master
