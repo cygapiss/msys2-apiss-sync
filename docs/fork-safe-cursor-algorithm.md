@@ -34,39 +34,51 @@ Queue: `Base`, `Left`, `Right`.
 - After `Left`: unsafe (`Right` is a sibling, not a descendant of `Left`).
 - After `Right`: safe (nothing left).
 
+## Queue order is already topological
+
+Each source list comes from `git log --reverse`: parents appear before children.
+The merged replay queue is a topological interleaving of the two source lists.
+
+No separate sort step is needed. We scan that order **once**, from the **last**
+commit to the **first**.
+
 ## Mainline color (first parent)
 
-Upstream history is a DAG. We do not scan all pairs `(i, j)`.
+Before the backward scan, mark mainline SHAs:
 
-**Color rule** (matches merge/fork structure in git):
+1. Walk from mirror tip following **first parent only** (`parent1`).
+2. Those commits are **mainline** (parent1 chain).
+3. All other queue commits are **side-branch** (parent2 / fork sibling lines).
+4. At a merge, `parent1` continues mainline; `parent2` side is absorbed at the
+   merge commit.
 
-1. Walk from mirror tip following **first parent only** (`parent1`). Those
-   commits form the **mainline** (safe spine).
-2. Commits **not** on that spine are **side-branch** (parent2 / fork sibling
-   lines). A side-branch commit is **never** a safe cursor position.
-3. At a merge, `parent1` continues mainline; commits that lived only on
-   `parent2` are absorbed when the merge commit is reached.
+`buildFirstParentSpine(parentMap, tipSha)` does this in one walk from tip.
 
-`buildFirstParentSpine(parentMap, tipSha)` marks mainline SHAs in one walk
-(O(depth), typically thousands of commits, done once per source).
+## Backward scan (last to first)
 
-## Open side branches in the suffix
+Single pass, **O(n)** over queue length `n` for one source:
 
-Scan the queue **backward** (suffix = entries not yet processed when standing
-at `i`).
+```text
+safe[n - 1] = true                    // last commit: empty suffix, always safe
 
-Track **open side tips**: non-mainline commits still in the suffix, collapsed
-to an **antichain** (incomparable branch heads only). When two side tips are
-ancestor/descendant, keep the descendant tip.
+sideTips = {}                         // non-mainline SHAs still in suffix
 
-For index `i`:
+for i from n - 2 down to 0:
+  if queue[i] not on mainline:
+    safe[i] = false
+  else:
+    safe[i] = every tip in sideTips is a descendant of queue[i]
 
-- If `queue[i]` is **not** on mainline: `safe[i] = false`.
-- If `queue[i]` is on mainline: `safe[i] = true` only when every open side tip
-  in the suffix is a **descendant** of `queue[i]` in the parent map.
+  if queue[i + 1] not on mainline:
+    sideTips = merge(sideTips, queue[i + 1])   // add suffix commit to open sides
+```
 
-Replay uses the precomputed flag at each index (O(1) lookup). Cursor branches
-update only when `safe[i]` is true and the destination SHA changed.
+`sideTips` holds incomparable side-branch heads still in the suffix (antichain).
+When one side tip is an ancestor of another, keep the descendant only.
+
+Ancestor checks use the parent map with memoization. Each queue index is visited
+once; there is no inner loop over all `n` suffix entries and no extra factor
+beyond `n`.
 
 ## Example
 
@@ -78,39 +90,19 @@ Fork with `Right` on mainline (first-parent chain from tip):
 | 1     | Left   | no        | no   |
 | 2     | Right  | yes       | yes  |
 
-At `Base`, suffix has open side tip `Left`; `Left` descends from `Base`, so
-mainline `Base` is safe. At `Left`, side commits are never safe.
+Scan from index 2: `safe[2] = true` (base case).
 
-## What is k (and why it is not a tuning knob)
+At index 1: `Left` is not mainline, so `safe[1] = false`.
 
-Some descriptions use **O(n * k)** for the backward queue scan:
-
-- **n** = queue length for one source (~11k ports, ~57k mingw).
-- **k** = number of open side tips in the antichain **at that step** (not a
-  config value and not n).
-
-**k is usually 0 or 1** on mostly-linear package history: one mainline, no
-parallel side branch waiting in the suffix.
-
-**k briefly grows** when a fork puts multiple incomparable side tips in the
-suffix (e.g. two sibling branches before either merges). It drops back when
-those commits are passed or absorbed by a merge on mainline.
-
-So **k is not something you choose**. It is how many parallel non-mainline
-branch heads are still "open" at a point in the queue. The algorithm does not
-loop over all n suffix entries; it only checks ancestor relations against those
-k tips (with memoization on the DAG).
-
-Worst-case k can be larger on pathological fork-heavy graphs, but MSYS2 package
-repos are dominated by first-parent mainline with occasional side merges.
+At index 0: `Base` is mainline; suffix side tip `Left` descends from `Base`, so
+`safe[0] = true`.
 
 ## Per-source and merged queue
 
 `precomputeReplayCursorBranchSafeFlags`:
 
 1. Split merged queue into ports and ports-mingw lists (git order preserved).
-2. Run mainline + side-antichain precompute on each list with that source's
-   parent map.
+2. Run spine mark + backward scan on each list with that source's parent map.
 3. For merged index `i`, `safe[i] = portsSafe[portsIndex] && mingwSafe[mingwIndex]`
    (both sources must be fork-safe at that replay point).
 
@@ -118,8 +110,7 @@ repos are dominated by first-parent mainline with occasional side merges.
 
 | Phase   | Work |
 |---------|------|
-| Prepare | Parent maps (`rev-list --parents`), spine, safe flags |
+| Prepare | Parent maps (`rev-list --parents`), mainline spine, backward safe scan |
 | Replay  | O(1) flag lookup; git only for diff/commit; cursor branch writes only when safe and SHA changed |
 
-This matches the pipeline: fetch history, prepare expensive graph work, then
-replay.
+Fetch history, prepare graph work once, then replay.

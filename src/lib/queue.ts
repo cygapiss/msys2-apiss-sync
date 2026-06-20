@@ -202,7 +202,7 @@ export function precomputeSourceCursorBranchSafeFlags(
   const flags = new Array<boolean>(count);
   const memo = new Map<string, boolean>();
   const lastSha = queueEntries[count - 1]!.Sha;
-  flags[count - 1] = spine.has(lastSha);
+  flags[count - 1] = true;
 
   let sideAntichain: string[] = spine.has(lastSha) ? [] : [lastSha];
   for (let index = count - 2; index >= 0; index--) {
