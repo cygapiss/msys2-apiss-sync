@@ -50,6 +50,10 @@ function commitMirror(repoPath: string, relativePath: string, message: string, d
   return runGit(repoPath, ['rev-parse', 'HEAD']).trim();
 }
 
+function setDestinationRemoteBranch(destPath: string, branchName: string, sha: string): void {
+  runGit(destPath, ['update-ref', `refs/remotes/origin/${branchName}`, sha]);
+}
+
 function commitDestinationReplay(
   destPath: string,
   relativePath: string,
@@ -106,6 +110,9 @@ describe('resolveSyncRetrieveCursorsFromBranches', () => {
       runGit(destPath, ['checkout', '-B', 'upstream', mingwDestSha]);
       setDestinationBranchSha(destPath, 'upstream-ports', portsDestSha);
       setDestinationBranchSha(destPath, 'upstream-ports-mingw', mingwDestSha);
+      setDestinationRemoteBranch(destPath, 'upstream', mingwDestSha);
+      setDestinationRemoteBranch(destPath, 'upstream-ports', portsDestSha);
+      setDestinationRemoteBranch(destPath, 'upstream-ports-mingw', mingwDestSha);
 
       expect(resolveSyncRetrieveCursorsFromBranches(destPath, config)).toEqual({
         PortsDestSha: portsDestSha,
@@ -183,6 +190,9 @@ describe('branch-based resume retrieve', () => {
       runGit(destPath, ['checkout', '-B', 'upstream', portsReplayTwo]);
       setDestinationBranchSha(destPath, 'upstream-ports', portsReplayTwo);
       setDestinationBranchSha(destPath, 'upstream-ports-mingw', mingwReplayOne);
+      setDestinationRemoteBranch(destPath, 'upstream', portsReplayTwo);
+      setDestinationRemoteBranch(destPath, 'upstream-ports', portsReplayTwo);
+      setDestinationRemoteBranch(destPath, 'upstream-ports-mingw', mingwReplayOne);
 
       const cursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
       expect(cursors.PortsUpstreamSha).toBe(portsTwo);
@@ -243,6 +253,9 @@ describe('branch-based resume retrieve', () => {
       runGit(destPath, ['checkout', '-B', 'upstream', mingwDestSha]);
       setDestinationBranchSha(destPath, 'upstream-ports', portsDestSha);
       setDestinationBranchSha(destPath, 'upstream-ports-mingw', mingwDestSha);
+      setDestinationRemoteBranch(destPath, 'upstream', mingwDestSha);
+      setDestinationRemoteBranch(destPath, 'upstream-ports', portsDestSha);
+      setDestinationRemoteBranch(destPath, 'upstream-ports-mingw', mingwDestSha);
 
       const cursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
       const [portsList, mingwList] = await Promise.all([

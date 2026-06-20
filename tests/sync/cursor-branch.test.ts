@@ -284,6 +284,7 @@ describe('fork-safe cursor branches after abort', () => {
 
       runGit(destPath, ['checkout', '-B', 'upstream', leftDestSha]);
       setDestinationBranchSha(destPath, 'upstream-ports', baseDestSha);
+      runGit(destPath, ['update-ref', 'refs/remotes/origin/upstream-ports', baseDestSha]);
 
       const parentMap = buildCommitParentMapForShas(mirrorPath, [Base, Left, Right]);
       const queue = [newPortsEntry(Base), newPortsEntry(Left), newPortsEntry(Right)];
@@ -311,6 +312,33 @@ describe('fork-safe cursor branches after abort', () => {
       expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).PortsUpstreamSha).toBe(Base);
       expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).PortsUpstreamSha).not.toBe(Left);
       expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).PortsUpstreamSha).not.toBe(Right);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('getDestinationBranchSha reads origin/<branch> only', () => {
+    const root = mkdtempSync(join(tmpdir(), 'sync-origin-ref-'));
+    try {
+      const destPath = join(root, 'msys2-apiss');
+      initRepo(destPath);
+      const originSha = commitDestinationReplay(destPath, 'ports/a.txt', {
+        SortKey: 'ports',
+        Subject: 'a',
+        UpstreamRepo: 'msys2/MSYS2-packages',
+        UpstreamSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      });
+      const localSha = commitDestinationReplay(destPath, 'ports/b.txt', {
+        SortKey: 'ports',
+        Subject: 'b',
+        UpstreamRepo: 'msys2/MSYS2-packages',
+        UpstreamSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      });
+      runGit(destPath, ['update-ref', 'refs/remotes/origin/upstream', originSha]);
+      runGit(destPath, ['branch', '-f', 'upstream', localSha]);
+
+      expect(getDestinationBranchSha(destPath, 'upstream')).toBe(originSha);
+      expect(getDestinationBranchSha(destPath, 'upstream')).not.toBe(localSha);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

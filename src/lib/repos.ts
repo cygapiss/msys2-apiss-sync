@@ -48,7 +48,12 @@ export function initializeDestinationRepository(input: {
   Logger: SyncLogger;
 }): string {
   if (input.DestinationPath) {
-    return realpathSync(input.DestinationPath);
+    const destPath = realpathSync(input.DestinationPath);
+    if (!input.SkipFetch) {
+      runGit(destPath, ['fetch', 'origin', '--prune'], {}, 5, input.Logger);
+    }
+    setGitRepoUtf8Encoding(destPath);
+    return destPath;
   }
 
   const destRoot = join(input.WorkDirectory, 'destination');
@@ -110,10 +115,23 @@ export function setDestinationReplayCheckout(
     runGit(destinationPath, ['checkout', '-B', replayBranch, config.Destination.BaseCommit]);
     return;
   }
-  runGit(destinationPath, ['checkout', replayBranch]);
+  const replayTipSha = getDestinationBranchSha(destinationPath, replayBranch);
+  if (!replayTipSha) {
+    throw new Error(`Missing destination branch origin/${replayBranch}`);
+  }
+  runGit(destinationPath, ['checkout', '-B', replayBranch, replayTipSha]);
 }
 
+/** Remote destination branch tip (origin/<branch> only). */
 export function getDestinationBranchSha(destinationPath: string, branchName: string): string | null {
+  try {
+    return runGitText(destinationPath, ['rev-parse', `origin/${branchName}`]).trim();
+  } catch {
+    return null;
+  }
+}
+
+function getLocalDestinationBranchSha(destinationPath: string, branchName: string): string | null {
   try {
     return runGitText(destinationPath, ['rev-parse', branchName]).trim();
   } catch {
@@ -265,6 +283,17 @@ export function clearDestinationSyncBranches(destinationPath: string, config: Sy
     } catch {
       // Branch may not exist.
     }
+    try {
+      runGit(destinationPath, ['update-ref', '-d', `refs/remotes/origin/${branchName}`]);
+    } catch {
+      // Remote-tracking ref may not exist.
+    }
+  }
+
+  try {
+    runGit(destinationPath, ['update-ref', '-d', `refs/remotes/origin/${replayBranch}`]);
+  } catch {
+    // Remote-tracking ref may not exist.
   }
 }
 
@@ -280,7 +309,7 @@ export function pushDestinationBranches(
     config.Destination.Branches.CursorPorts,
     config.Destination.Branches.CursorPortsMingw
   ]) {
-    const sha = getDestinationBranchSha(destinationPath, branchName);
+    const sha = getLocalDestinationBranchSha(destinationPath, branchName);
     if (sha) {
       runGit(destinationPath, ['push', 'origin', branchName]);
     } else {

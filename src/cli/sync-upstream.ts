@@ -59,8 +59,6 @@ async function main(): Promise<void> {
     const maxCommits = readIntOption(args, '--max-commits', 0);
     const destinationPathArg = readStringOption(args, '--destination-path');
     const replayBranch = config.Destination.Branches.Replay;
-    const cursorPortsBranch = config.Destination.Branches.CursorPorts;
-    const cursorMingwBranch = config.Destination.Branches.CursorPortsMingw;
 
     logger.write(`Sync-Upstream start (clean=${clean} dryRun=${dryRun} skipFetch=${skipFetch})`);
 
@@ -90,18 +88,28 @@ async function main(): Promise<void> {
     ensureDestinationBaseCommit(destPath, config, logger);
 
     if (clean) {
-      logger.write('Clean: resetting sync branches');
+      logger.write('Clean: resetting destination sync branches');
       clearDestinationSyncBranches(destPath, config, logger);
     }
 
-    const portsDestSha = getDestinationBranchSha(destPath, cursorPortsBranch);
-    const mingwDestSha = getDestinationBranchSha(destPath, cursorMingwBranch);
-    const retrieveCursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
-    const cursorPorts = retrieveCursors.PortsUpstreamSha;
-    const cursorMingw = retrieveCursors.PortsMingwUpstreamSha;
+    let portsDestSha: string | null = null;
+    let mingwDestSha: string | null = null;
+    let cursorPorts: string | null = null;
+    let cursorMingw: string | null = null;
+    let isFullReplay: boolean;
+
+    if (clean) {
+      isFullReplay = true;
+    } else {
+      const retrieveCursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
+      portsDestSha = retrieveCursors.PortsDestSha;
+      mingwDestSha = retrieveCursors.PortsMingwDestSha;
+      cursorPorts = retrieveCursors.PortsUpstreamSha;
+      cursorMingw = retrieveCursors.PortsMingwUpstreamSha;
+      isFullReplay = !testAllSyncBranchesExist(destPath, config);
+    }
     let lastPortsDestSha = portsDestSha;
     let lastMingwDestSha = mingwDestSha;
-    let isFullReplay = !testAllSyncBranchesExist(destPath, config);
 
     if (isFullReplay) {
       logger.write('Bootstrap: full replay (no age gate)');
@@ -110,13 +118,15 @@ async function main(): Promise<void> {
     }
 
     if (!dryRun) {
-      const replayTipSha = getDestinationBranchSha(destPath, replayBranch);
-      if (replayTipSha) {
+      if (clean || isFullReplay) {
+        setDestinationReplayCheckout(destPath, config, true);
+      } else {
+        const replayTipSha = getDestinationBranchSha(destPath, replayBranch);
+        if (!replayTipSha) {
+          throw new Error(`Missing destination branch origin/${replayBranch}`);
+        }
         runGit(destPath, ['checkout', '-B', replayBranch, replayTipSha]);
         runGit(destPath, ['reset', '--hard', 'HEAD']);
-        isFullReplay = false;
-      } else {
-        setDestinationReplayCheckout(destPath, config, isFullReplay);
       }
     } else {
       setDestinationReplayCheckout(destPath, config, isFullReplay);
