@@ -236,9 +236,11 @@ export function precomputeReplayCursorBranchSafeFlags(input: {
   Queue: ReplayEntry[];
   ParentMapPorts: CommitParentMap;
   ParentMapMingw: CommitParentMap;
+  PortsEntries?: readonly ReplayEntry[];
+  PortsMingwEntries?: readonly ReplayEntry[];
 }): boolean[] {
-  const portsEntries = input.Queue.filter((entry) => entry.SourceId === 'ports');
-  const mingwEntries = input.Queue.filter((entry) => entry.SourceId === 'ports-mingw');
+  const portsEntries = input.PortsEntries ?? input.Queue.filter((entry) => entry.SourceId === 'ports');
+  const mingwEntries = input.PortsMingwEntries ?? input.Queue.filter((entry) => entry.SourceId === 'ports-mingw');
   const portsSafe = precomputeSourceCursorBranchSafeFlags(portsEntries, input.ParentMapPorts);
   const mingwSafe = precomputeSourceCursorBranchSafeFlags(mingwEntries, input.ParentMapMingw);
   const flags = new Array<boolean>(input.Queue.length);

@@ -146,7 +146,9 @@ async function main(): Promise<void> {
     const cursorBranchSafeFlags = precomputeReplayCursorBranchSafeFlags({
       Queue: queue,
       ParentMapPorts: parentMapPorts,
-      ParentMapMingw: parentMapMingw
+      ParentMapMingw: parentMapMingw,
+      PortsEntries: portsList,
+      PortsMingwEntries: mingwList
     });
     logger.write('Precomputed fork-safe cursor branch flags');
 
