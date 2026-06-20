@@ -2,7 +2,12 @@ import { runGitText, runGit } from '../lib/git.ts';
 import { getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
-import { filterReplayQueueByAge, mergeReplayCommitQueues, buildMirrorCommitParentMap, testSyncCursorBranchUpdateSafe } from '../lib/queue.ts';
+import {
+  buildMirrorCommitParentMap,
+  filterReplayQueueByAge,
+  mergeReplayCommitQueues,
+  precomputeReplayCursorBranchSafeFlags
+} from '../lib/queue.ts';
 import {
   advanceSyncCursorDestShasIfSafe,
   clearDestinationSyncBranches,
@@ -15,6 +20,7 @@ import {
   resolveSyncRetrieveCursorsFromBranches,
   setDestinationReplayCheckout,
   testAllSyncBranchesExist,
+  updateDestinationCursorBranchRefs,
   updateDestinationSyncBranchRefs
 } from '../lib/repos.ts';
 import {
@@ -137,12 +143,17 @@ async function main(): Promise<void> {
       buildMirrorCommitParentMap(mirrorPorts, config.Sources.Ports.Branch),
       buildMirrorCommitParentMap(mirrorMingw, config.Sources.PortsMingw.Branch)
     ]);
+    const cursorBranchSafeFlags = precomputeReplayCursorBranchSafeFlags({
+      Queue: queue,
+      ParentMapPorts: parentMapPorts,
+      ParentMapMingw: parentMapMingw
+    });
+    logger.write('Precomputed fork-safe cursor branch flags');
 
     let replayed = 0;
     let lastPortsSha = cursorPorts;
     let lastMingwSha = cursorMingw;
     const skipEmpty = Boolean(config.Replay.SkipEmptyTreeDiff);
-    const cursorBranchAncestorMemo = new Map<string, boolean>();
 
     for (let index = 0; index < queue.length; index++) {
       const entry = queue[index]!;
@@ -191,30 +202,27 @@ async function main(): Promise<void> {
       }
 
       if (!dryRun && entryReplayed) {
-        const replayTipSha = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
-        const cursorBranchSafe = testSyncCursorBranchUpdateSafe({
-          Queue: queue,
-          Index: index,
-          LastPortsSha: lastPortsSha,
-          LastPortsMingwSha: lastMingwSha,
-          ParentMapPorts: parentMapPorts,
-          ParentMapMingw: parentMapMingw,
-          AncestorMemo: cursorBranchAncestorMemo
-        });
-        const nextCursorDestShas = advanceSyncCursorDestShasIfSafe({
-          SourceId: entry.SourceId,
-          ReplayTipSha: replayTipSha,
-          CursorBranchSafe: cursorBranchSafe,
-          LastPortsDestSha: lastPortsDestSha,
-          LastMingwDestSha: lastMingwDestSha
-        });
-        lastPortsDestSha = nextCursorDestShas.PortsDestSha;
-        lastMingwDestSha = nextCursorDestShas.PortsMingwDestSha;
-        updateDestinationSyncBranchRefs(destPath, config, {
-          ReplayTipSha: replayTipSha,
-          PortsDestSha: lastPortsDestSha,
-          PortsMingwDestSha: lastMingwDestSha
-        });
+        const cursorBranchSafe = cursorBranchSafeFlags[index] ?? false;
+        if (cursorBranchSafe) {
+          const replayTipSha = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
+          const nextCursorDestShas = advanceSyncCursorDestShasIfSafe({
+            SourceId: entry.SourceId,
+            ReplayTipSha: replayTipSha,
+            CursorBranchSafe: cursorBranchSafe,
+            LastPortsDestSha: lastPortsDestSha,
+            LastMingwDestSha: lastMingwDestSha
+          });
+          const portsDestChanged = nextCursorDestShas.PortsDestSha !== lastPortsDestSha;
+          const mingwDestChanged = nextCursorDestShas.PortsMingwDestSha !== lastMingwDestSha;
+          lastPortsDestSha = nextCursorDestShas.PortsDestSha;
+          lastMingwDestSha = nextCursorDestShas.PortsMingwDestSha;
+          if (portsDestChanged || mingwDestChanged) {
+            updateDestinationCursorBranchRefs(destPath, config, {
+              PortsDestSha: portsDestChanged ? lastPortsDestSha : null,
+              PortsMingwDestSha: mingwDestChanged ? lastMingwDestSha : null
+            });
+          }
+        }
       }
 
       if ((index + 1) % 100 === 0) {

@@ -13,6 +13,9 @@ import {
 } from '../../src/lib/repos.ts';
 import {
   buildCommitParentMapForShas,
+  buildFirstParentSpine,
+  precomputeReplayCursorBranchSafeFlags,
+  precomputeSourceCursorBranchSafeFlags,
   testSyncCursorBranchUpdateSafe
 } from '../../src/lib/queue.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
@@ -172,6 +175,62 @@ describe('testSyncCursorBranchUpdateSafe', () => {
         ParentMapPorts: parentMap,
         ParentMapMingw: parentMap
       })).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('precomputeSourceCursorBranchSafeFlags', () => {
+  test('marks first-parent mainline safe and parent2 side branches unsafe', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-spine-'));
+    try {
+      const mirrorPath = join(root, 'mirror');
+      const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
+      const parentMap = buildCommitParentMapForShas(mirrorPath, [Base, Left, Right]);
+      const queue = [newPortsEntry(Base), newPortsEntry(Left), newPortsEntry(Right)];
+      const spine = buildFirstParentSpine(parentMap, Right);
+      const flags = precomputeSourceCursorBranchSafeFlags(queue, parentMap, Right);
+
+      expect(spine.has(Base)).toBe(true);
+      expect(spine.has(Right)).toBe(true);
+      expect(spine.has(Left)).toBe(false);
+      expect(flags).toEqual([true, false, true]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('precomputeReplayCursorBranchSafeFlags', () => {
+  test('matches testSyncCursorBranchUpdateSafe for fork queue positions', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-precompute-'));
+    try {
+      const mirrorPath = join(root, 'mirror');
+      const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
+      const parentMap = buildCommitParentMapForShas(mirrorPath, [Base, Left, Right]);
+      const queue = [newPortsEntry(Base), newPortsEntry(Left), newPortsEntry(Right)];
+      const flags = precomputeReplayCursorBranchSafeFlags({
+        Queue: queue,
+        ParentMapPorts: parentMap,
+        ParentMapMingw: parentMap
+      });
+
+      let lastPortsSha: string | null = null;
+      for (let index = 0; index < queue.length; index++) {
+        const entry = queue[index]!;
+        if (entry.SourceId === 'ports') {
+          lastPortsSha = entry.Sha;
+        }
+        expect(flags[index]).toBe(testSyncCursorBranchUpdateSafe({
+          Queue: queue,
+          Index: index,
+          LastPortsSha: lastPortsSha,
+          LastPortsMingwSha: null,
+          ParentMapPorts: parentMap,
+          ParentMapMingw: parentMap
+        }));
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

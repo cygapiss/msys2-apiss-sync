@@ -153,6 +153,22 @@ export function setDestinationBranchSha(destinationPath: string, branchName: str
   runGit(destinationPath, ['branch', '-f', branchName, sha]);
 }
 
+export function updateDestinationCursorBranchRefs(
+  destinationPath: string,
+  config: SyncConfig,
+  input: {
+    PortsDestSha: string | null;
+    PortsMingwDestSha: string | null;
+  }
+): void {
+  if (input.PortsDestSha) {
+    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPorts, input.PortsDestSha);
+  }
+  if (input.PortsMingwDestSha) {
+    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPortsMingw, input.PortsMingwDestSha);
+  }
+}
+
 export function updateDestinationSyncBranchRefs(
   destinationPath: string,
   config: SyncConfig,
@@ -163,12 +179,10 @@ export function updateDestinationSyncBranchRefs(
   }
 ): void {
   setDestinationBranchSha(destinationPath, config.Destination.Branches.Replay, input.ReplayTipSha);
-  if (input.PortsDestSha) {
-    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPorts, input.PortsDestSha);
-  }
-  if (input.PortsMingwDestSha) {
-    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPortsMingw, input.PortsMingwDestSha);
-  }
+  updateDestinationCursorBranchRefs(destinationPath, config, {
+    PortsDestSha: input.PortsDestSha,
+    PortsMingwDestSha: input.PortsMingwDestSha
+  });
 }
 
 export function resolveUpstreamCursorSha(

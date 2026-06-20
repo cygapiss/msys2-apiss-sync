@@ -152,6 +152,106 @@ export function testSyncCursorBranchUpdateSafe(input: {
   return true;
 }
 
+export function buildFirstParentSpine(parentMap: CommitParentMap, tipSha: string): ReadonlySet<string> {
+  const spine = new Set<string>();
+  let current: string | undefined = tipSha;
+  while (current) {
+    spine.add(current);
+    const parents = parentMap.get(current);
+    if (!parents || parents.length === 0) {
+      break;
+    }
+    current = parents[0];
+  }
+  return spine;
+}
+
+function mergeSuffixAntichain(
+  antichain: readonly string[],
+  sha: string,
+  parentMap: CommitParentMap,
+  memo: Map<string, boolean>
+): string[] {
+  for (const existing of antichain) {
+    if (testCommitIsAncestor(parentMap, existing, sha, memo)) {
+      return [...antichain];
+    }
+  }
+
+  const next: string[] = [];
+  for (const existing of antichain) {
+    if (!testCommitIsAncestor(parentMap, sha, existing, memo)) {
+      next.push(existing);
+    }
+  }
+  next.push(sha);
+  return next;
+}
+
+export function precomputeSourceCursorBranchSafeFlags(
+  queueEntries: readonly ReplayEntry[],
+  parentMap: CommitParentMap,
+  tipSha?: string
+): boolean[] {
+  const count = queueEntries.length;
+  if (count === 0) {
+    return [];
+  }
+
+  const spine = buildFirstParentSpine(parentMap, tipSha ?? queueEntries[count - 1]!.Sha);
+  const flags = new Array<boolean>(count);
+  const memo = new Map<string, boolean>();
+  const lastSha = queueEntries[count - 1]!.Sha;
+  flags[count - 1] = spine.has(lastSha);
+
+  let sideAntichain: string[] = spine.has(lastSha) ? [] : [lastSha];
+  for (let index = count - 2; index >= 0; index--) {
+    const sha = queueEntries[index]!.Sha;
+    if (!spine.has(sha)) {
+      flags[index] = false;
+    } else {
+      flags[index] = sideAntichain.every((tipSha) => testCommitIsAncestor(parentMap, sha, tipSha, memo));
+    }
+
+    const suffixSha = queueEntries[index + 1]!.Sha;
+    if (!spine.has(suffixSha)) {
+      sideAntichain = mergeSuffixAntichain(sideAntichain, suffixSha, parentMap, memo);
+    }
+  }
+
+  return flags;
+}
+
+export function precomputeReplayCursorBranchSafeFlags(input: {
+  Queue: ReplayEntry[];
+  ParentMapPorts: CommitParentMap;
+  ParentMapMingw: CommitParentMap;
+}): boolean[] {
+  const portsEntries = input.Queue.filter((entry) => entry.SourceId === 'ports');
+  const mingwEntries = input.Queue.filter((entry) => entry.SourceId === 'ports-mingw');
+  const portsSafe = precomputeSourceCursorBranchSafeFlags(portsEntries, input.ParentMapPorts);
+  const mingwSafe = precomputeSourceCursorBranchSafeFlags(mingwEntries, input.ParentMapMingw);
+  const flags = new Array<boolean>(input.Queue.length);
+  let portsIndex = 0;
+  let mingwIndex = 0;
+  let portsCursorSafe = true;
+  let mingwCursorSafe = true;
+
+  for (let index = 0; index < input.Queue.length; index++) {
+    const entry = input.Queue[index]!;
+    if (entry.SourceId === 'ports') {
+      portsCursorSafe = portsSafe[portsIndex] ?? true;
+      portsIndex++;
+    } else {
+      mingwCursorSafe = mingwSafe[mingwIndex] ?? true;
+      mingwIndex++;
+    }
+    flags[index] = portsCursorSafe && mingwCursorSafe;
+  }
+
+  return flags;
+}
+
 export function filterReplayQueueByAge(
   queue: ReplayEntry[],
   config: SyncConfig,
