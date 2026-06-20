@@ -80,7 +80,7 @@ function commitDestinationReplay(
 
 describe('resolveSyncRetrieveCursorsFromBranches', () => {
   test('reads upstream mirror cursors from upstream-ports and upstream-ports-mingw', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-resume-cursors-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-resume-cursors-'));
     try {
       const destPath = join(root, 'destination');
       initRepo(destPath);
@@ -119,7 +119,7 @@ describe('resolveSyncRetrieveCursorsFromBranches', () => {
   });
 
   test('returns null upstream cursors when cursor branches are missing', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-resume-missing-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-resume-missing-'));
     try {
       const destPath = join(root, 'destination');
       initRepo(destPath);
@@ -139,7 +139,7 @@ describe('resolveSyncRetrieveCursorsFromBranches', () => {
 
 describe('branch-based resume retrieve', () => {
   test('rebuilds remaining queue from upstream-ports and upstream-ports-mingw', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-resume-queue-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-resume-queue-'));
     try {
       const mirrorPorts = join(root, 'mirror-ports');
       const mirrorMingw = join(root, 'mirror-mingw');
@@ -207,7 +207,7 @@ describe('branch-based resume retrieve', () => {
   });
 
   test('independent cursor branches resume each source from its own replay point', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-resume-split-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-resume-split-'));
     try {
       const mirrorPorts = join(root, 'mirror-ports');
       const mirrorMingw = join(root, 'mirror-mingw');

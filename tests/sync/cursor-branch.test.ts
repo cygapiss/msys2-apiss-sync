@@ -118,7 +118,7 @@ function buildPortsForkMirror(mirrorPath: string): { Base: string; Left: string;
 
 describe('testSyncCursorBranchUpdateSafe', () => {
   test('allows cursor advance at fork root before siblings diverge', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-fork-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-cursor-fork-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
@@ -139,7 +139,7 @@ describe('testSyncCursorBranchUpdateSafe', () => {
   });
 
   test('blocks cursor advance while a fork sibling remains in the queue', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-fork-block-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-cursor-fork-block-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
@@ -160,7 +160,7 @@ describe('testSyncCursorBranchUpdateSafe', () => {
   });
 
   test('allows cursor advance after the last fork sibling is processed', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-fork-done-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-cursor-fork-done-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
@@ -183,7 +183,7 @@ describe('testSyncCursorBranchUpdateSafe', () => {
 
 describe('precomputeSourceCursorBranchSafeFlags', () => {
   test('marks first-parent mainline safe and parent2 side branches unsafe', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-spine-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-cursor-spine-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
@@ -204,7 +204,7 @@ describe('precomputeSourceCursorBranchSafeFlags', () => {
 
 describe('precomputeReplayCursorBranchSafeFlags', () => {
   test('matches testSyncCursorBranchUpdateSafe for fork queue positions', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-precompute-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-cursor-precompute-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const { Base, Left, Right } = buildPortsForkMirror(mirrorPath);
@@ -262,7 +262,7 @@ describe('advanceSyncCursorDestShasIfSafe', () => {
 
 describe('fork-safe cursor branches after abort', () => {
   test('upstream-ports stays at fork root when replay aborted on a sibling line', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-cursor-abort-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-cursor-abort-'));
     try {
       const mirrorPath = join(root, 'mirror-ports');
       const destPath = join(root, 'destination');

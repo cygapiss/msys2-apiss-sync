@@ -37,7 +37,7 @@ function newPortsEntry(sha: string): ReplayEntry {
 
 describe('replay-graph cache', () => {
   test('serializes and loads parent map from disk', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-replay-graph-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-replay-graph-'));
     try {
       const parentMap = new Map<string, readonly string[]>([
         ['c3', ['c2']],
@@ -62,7 +62,7 @@ describe('replay-graph cache', () => {
 
 describe('fork-safe flags from saved graph', () => {
   test('precompute matches mainline spine rule using saved graph', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-replay-graph-fork-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-replay-graph-fork-'));
     try {
       const mirrorPath = join(root, 'mirror');
 

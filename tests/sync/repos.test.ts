@@ -29,7 +29,7 @@ function initTestRepo(repoPath: string): void {
 
 describe('setDestinationBranchSha', () => {
   test('updates checked-out branch without branch -f', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-repos-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-repos-'));
     try {
       const repoPath = join(root, 'repo');
       initTestRepo(repoPath);
@@ -50,7 +50,7 @@ describe('setDestinationBranchSha', () => {
   });
 
   test('updates unchecked branch with branch -f', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-repos-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-repos-'));
     try {
       const repoPath = join(root, 'repo');
       initTestRepo(repoPath);
@@ -78,7 +78,7 @@ describe('setDestinationBranchSha', () => {
 
 describe('resolveUpstreamCursorSha', () => {
   test('reads upstream sha from destination replay commit', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-repos-cursor-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-repos-cursor-'));
     try {
       const destPath = join(root, 'destination');
       initTestRepo(destPath);
@@ -107,7 +107,7 @@ describe('resolveUpstreamCursorSha', () => {
   });
 
   test('returns null when commit message has no source footer', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-repos-cursor-empty-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-repos-cursor-empty-'));
     try {
       const destPath = join(root, 'destination');
       initTestRepo(destPath);

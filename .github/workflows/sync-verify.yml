@@ -39,7 +39,7 @@ jobs:
       - name: Clone destination repository
         run: |
           mkdir -p .work/destination
-          git clone "https://github.com/msys2-uwp/msys2-uwp.git" .work/destination/msys2-uwp
+          git clone "https://github.com/msys2-apiss/msys2-apiss.git" .work/destination/msys2-apiss
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -48,7 +48,7 @@ jobs:
         id: verify
         continue-on-error: true
         run: |
-          yarn sync --dry-run --skip-fetch --destination-path .work/destination/msys2-uwp
+          yarn sync --dry-run --skip-fetch --destination-path .work/destination/msys2-apiss
 
       - name: Open issue on mismatch
         if: steps.verify.outcome == 'failure'

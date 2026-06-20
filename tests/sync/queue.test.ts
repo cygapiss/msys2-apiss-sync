@@ -65,7 +65,7 @@ function initTestRepo(repoPath: string): void {
 
 describe('getFirstParentFromMap', () => {
   test('matches git rev-list for commits on the branch', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-parent-map-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-parent-map-'));
     try {
       const mirrorPath = join(root, 'mirror');
       initTestRepo(mirrorPath);

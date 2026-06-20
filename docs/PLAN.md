@@ -2,7 +2,7 @@
 
 Sync upstream package history from [msys2/MINGW-packages](https://github.com/msys2/MINGW-packages)
 and [msys2/MSYS2-packages](https://github.com/msys2/MSYS2-packages) into
-[msys2-uwp/msys2-uwp](https://github.com/msys2-uwp/msys2-uwp).
+[msys2-apiss/msys2-apiss](https://github.com/msys2-apiss/msys2-apiss).
 
 ## Key design change
 
@@ -14,7 +14,7 @@ Sync behavior is derived from **destination branch presence**:
 | Any branch missing | **Bootstrap** -- full replay from history root, no age gate |
 | `--clean` passed | Delete/reset all three branches first, then bootstrap |
 
-Branches (all in `msys2-uwp/msys2-uwp`):
+Branches (all in `msys2-apiss/msys2-apiss`):
 
 - `upstream` -- replayed linear history tip (full merged replay progress)
 - `upstream-ports` -- destination replay commit used to resume MSYS2-packages retrieve
@@ -130,7 +130,7 @@ upstream tips.
 
 ```bash
 node src/cli/sync-upstream.ts \
-  --destination-path .work/destination/msys2-uwp \
+  --destination-path .work/destination/msys2-apiss \
   [--clean] \
   [--dry-run] \
   [--max-commits <n>]
@@ -575,8 +575,8 @@ Edit in git only when values change (rare).
 {
   "ReplaySpecVersion": 4,
   "Destination": {
-    "Owner": "msys2-uwp",
-    "Repo": "msys2-uwp",
+    "Owner": "msys2-apiss",
+    "Repo": "msys2-apiss",
     "BaseCommit": "6fc20894663468a04dd4986a8b1c15a9d5ae8649",
     "Branches": {
       "Replay": "upstream",
@@ -601,7 +601,7 @@ Edit in git only when values change (rare).
     }
   },
   "Mirrors": {
-    "Owner": "msys2-uwp",
+    "Owner": "msys2-apiss",
     "Ports": "MSYS2-packages",
     "PortsMingw": "MINGW-packages",
     "SyncIntervalMinutes": 5,
@@ -623,7 +623,7 @@ Edit in git only when values change (rare).
 | `ReplaySpecVersion` | Algorithm version; bump to 5 if commit-step optimization changes replay SHAs |
 | `Destination.*` | Target repo, base commit, branch names |
 | `Sources.*` | Upstream repos, paths, sort keys |
-| `Mirrors.*` | Mirror repos (`msys2-uwp/MSYS2-packages`, `msys2-uwp/MINGW-packages`), sync interval, dispatch event |
+| `Mirrors.*` | Mirror repos (`msys2-apiss/MSYS2-packages`, `msys2-apiss/MINGW-packages`), sync interval, dispatch event |
 
 Mirror repos use branch **`sync`** (default) for workflow YAML only; **`master`** is a
 pure fast-forward copy of upstream `master` with no workflow commits. Templates:
@@ -726,7 +726,7 @@ CI reads timing and repo constants from [`config/sync.json`](../config/sync.json
 
 GitHub Actions requires static cron in YAML; workflow comments reference sync.json as source of truth. Preflight step logs both values via `loadSyncConfig`.
 
-### Mirror repos (`msys2-uwp/MSYS2-packages`, `msys2-uwp/MINGW-packages`)
+### Mirror repos (`msys2-apiss/MSYS2-packages`, `msys2-apiss/MINGW-packages`)
 
 | Branch | Role |
 |--------|------|
@@ -735,7 +735,7 @@ GitHub Actions requires static cron in YAML; workflow comments reference sync.js
 
 `mirror-sync.yml` fetches upstream `master` and pushes `upstream/master` to
 `origin/master` without mutating the `sync` checkout. `mirror-dispatch.yml` fires on
-`push` to `master` and dispatches `upstream-updated` to `msys2-uwp/msys2-uwp-sync`.
+`push` to `master` and dispatches `upstream-updated` to `msys2-apiss/msys2-apiss-sync`.
 
 ### [`sync-upstream.yml`](../.github/workflows/sync-upstream.yml) changes
 

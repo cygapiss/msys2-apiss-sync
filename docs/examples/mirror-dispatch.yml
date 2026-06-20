@@ -3,7 +3,7 @@ name: Dispatch sync on mirror push
 # Install on mirror repo branch sync (set sync as default branch).
 # Copy to: sync/.github/workflows/mirror-dispatch.yml
 # Runs when mirror-sync updates master; workflows stay on sync, not master.
-# Requires secret SYNC_DISPATCH_TOKEN (repo scope, can dispatch msys2-uwp-sync).
+# Requires secret SYNC_DISPATCH_TOKEN (repo scope, can dispatch msys2-apiss-sync).
 
 on:
   push:
@@ -17,11 +17,11 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Notify msys2-uwp-sync
+      - name: Notify msys2-apiss-sync
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ secrets.SYNC_DISPATCH_TOKEN }}
-          repository: msys2-uwp/msys2-uwp-sync
+          repository: msys2-apiss/msys2-apiss-sync
           event-type: upstream-updated
           client-payload: >-
             {

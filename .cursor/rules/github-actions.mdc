@@ -19,8 +19,8 @@ alwaysApply: false
 
 | Mirror | Upstream |
 |--------|----------|
-| `msys2-uwp/MSYS2-packages` | `msys2/MSYS2-packages` |
-| `msys2-uwp/MINGW-packages` | `msys2/MINGW-packages` |
+| `msys2-apiss/MSYS2-packages` | `msys2/MSYS2-packages` |
+| `msys2-apiss/MINGW-packages` | `msys2/MINGW-packages` |
 
 Branch layout: **`sync`** (default) holds workflow YAML only; **`master`** is a
 pure fast-forward copy of upstream `master` (no workflow commits on master).
@@ -44,8 +44,8 @@ concurrency:
 
 ## Secrets
 
-- `MSYS2_UWP_SYNC_TOKEN`: write access to `msys2-uwp/msys2-uwp` and this repo
-- `SYNC_DISPATCH_TOKEN`: mirror repos only; dispatch `msys2-uwp-sync`
+- `MSYS2_UWP_SYNC_TOKEN`: write access to `msys2-apiss/msys2-apiss` and this repo
+- `SYNC_DISPATCH_TOKEN`: mirror repos only; dispatch `msys2-apiss-sync`
 - Never log tokens; pass via `env:` to script steps only.
 
 ## Push policy

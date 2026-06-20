@@ -1,5 +1,5 @@
 {
-  "name": "msys2-uwp-sync",
+  "name": "msys2-apiss-sync",
   "private": true,
   "packageManager": "yarn@1.22.22",
   "type": "module",

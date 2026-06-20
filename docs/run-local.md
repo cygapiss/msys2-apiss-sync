@@ -34,14 +34,14 @@ yarn merge-queue --skip-fetch
 Full sync (retrieve, merge, replay, push):
 
 ```bash
-yarn sync --destination-path .work/destination/msys2-uwp
+yarn sync --destination-path .work/destination/msys2-apiss
 ```
 
 Local replay without push (throttle for dev):
 
 ```bash
 yarn sync --dry-run --skip-fetch --max-commits 5
-yarn sync --skip-fetch --max-commits 10 --destination-path .work/destination/msys2-uwp
+yarn sync --skip-fetch --max-commits 10 --destination-path .work/destination/msys2-apiss
 ```
 
 Log to a file under `.work/cache/replay-log/` (`--log-file` suppresses console
@@ -62,13 +62,13 @@ yarn sync --dry-run --skip-fetch --max-commits 5 --log-file .work/cache/replay-l
 Continue after interrupt or failure (branch cursors in the destination clone):
 
 ```bash
-yarn sync --skip-fetch --destination-path .work/destination/msys2-uwp --log-file sync-run.log --log-append
+yarn sync --skip-fetch --destination-path .work/destination/msys2-apiss --log-file sync-run.log --log-append
 ```
 
 Bootstrap from scratch (reset sync branches, force-push):
 
 ```bash
-yarn sync --clean --destination-path .work/destination/msys2-uwp
+yarn sync --clean --destination-path .work/destination/msys2-apiss
 ```
 
 Unit tests:

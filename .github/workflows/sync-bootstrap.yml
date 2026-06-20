@@ -48,14 +48,14 @@ jobs:
           MSYS2_UWP_SYNC_TOKEN: ${{ secrets.MSYS2_UWP_SYNC_TOKEN }}
         run: |
           mkdir -p .work/destination
-          git clone "https://x-access-token:${MSYS2_UWP_SYNC_TOKEN}@github.com/msys2-uwp/msys2-uwp.git" .work/destination/msys2-uwp
+          git clone "https://x-access-token:${MSYS2_UWP_SYNC_TOKEN}@github.com/msys2-apiss/msys2-apiss.git" .work/destination/msys2-apiss
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
       - name: Run bootstrap
         run: |
-          args=(--clean --destination-path .work/destination/msys2-uwp)
+          args=(--clean --destination-path .work/destination/msys2-apiss)
           if [ "${{ inputs.max_commits }}" != "0" ]; then
             args+=(--max-commits "${{ inputs.max_commits }}")
           fi

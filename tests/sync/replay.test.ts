@@ -40,7 +40,7 @@ function writeRepoFile(repoPath: string, relativePath: string, text: string): vo
 
 describe('applyUpstreamCommitToIndex', () => {
   test('returns false when an upstream delete maps to no destination change', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-test-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-test-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const destinationPath = join(root, 'destination');
@@ -72,7 +72,7 @@ describe('applyUpstreamCommitToIndex', () => {
   });
 
   test('removes many mapped paths in one commit without argv overflow', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-bulk-rm-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-bulk-rm-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const destinationPath = join(root, 'destination');
@@ -117,7 +117,7 @@ describe('applyUpstreamCommitToIndex', () => {
   }, 30_000);
 
   test('returns false when upstream adds already match destination HEAD', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-test-add-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-test-add-'));
     try {
       const mirrorPath = join(root, 'mirror');
       const destinationPath = join(root, 'destination');
