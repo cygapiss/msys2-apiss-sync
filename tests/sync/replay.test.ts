@@ -71,6 +71,51 @@ describe('applyUpstreamCommitToIndex', () => {
     }
   });
 
+  test('removes many mapped paths in one commit without argv overflow', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-bulk-rm-'));
+    try {
+      const mirrorPath = join(root, 'mirror');
+      const destinationPath = join(root, 'destination');
+      initTestRepo(mirrorPath);
+      initTestRepo(destinationPath);
+
+      const fileCount = 200;
+      const packageDir = 'mingw-w64-bulk-remove-test/long-subdir-name';
+      for (let i = 0; i < fileCount; i++) {
+        const rel = `${packageDir}/0001-patch-file-number-${String(i).padStart(4, '0')}.patch`;
+        writeRepoFile(mirrorPath, rel, `content ${i}\n`);
+        writeRepoFile(destinationPath, `ports-mingw/${rel}`, `content ${i}\n`);
+      }
+      runGit(mirrorPath, ['add', '.']);
+      runGit(mirrorPath, ['commit', '-m', 'add many files']);
+      runGit(mirrorPath, ['rm', '-r', 'mingw-w64-bulk-remove-test']);
+      runGit(mirrorPath, ['commit', '-m', 'delete many files']);
+      const commit = runGit(mirrorPath, ['rev-parse', 'HEAD']).trim();
+      const parent = getFirstParent(mirrorPath, commit);
+
+      runGit(destinationPath, ['add', '.']);
+      runGit(destinationPath, ['commit', '-m', 'destination has mapped tree']);
+
+      const hasChanges = applyUpstreamCommitToIndex({
+        MirrorPath: mirrorPath,
+        Commit: commit,
+        Parent: parent,
+        DestSubdir: 'ports-mingw',
+        DestinationPath: destinationPath
+      });
+
+      expect(hasChanges).toBe(true);
+      const staged = runGit(destinationPath, ['diff', '--cached', '--name-only'])
+        .trim()
+        .split('\n')
+        .filter((line) => line.length > 0);
+      expect(staged).toHaveLength(fileCount);
+      expect(staged.every((path) => path.startsWith('ports-mingw/'))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   test('returns false when upstream adds already match destination HEAD', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-test-add-'));
     try {
