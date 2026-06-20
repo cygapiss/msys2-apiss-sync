@@ -136,6 +136,24 @@ export function setDestinationBranchSha(destinationPath: string, branchName: str
   runGit(destinationPath, ['branch', '-f', branchName, sha]);
 }
 
+export function updateDestinationSyncBranchRefs(
+  destinationPath: string,
+  config: SyncConfig,
+  input: {
+    ReplayTipSha: string;
+    PortsSha: string | null;
+    PortsMingwSha: string | null;
+  }
+): void {
+  setDestinationBranchSha(destinationPath, config.Destination.Branches.Replay, input.ReplayTipSha);
+  if (input.PortsSha) {
+    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPorts, input.PortsSha);
+  }
+  if (input.PortsMingwSha) {
+    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPortsMingw, input.PortsMingwSha);
+  }
+}
+
 export function clearDestinationSyncBranches(destinationPath: string, config: SyncConfig, logger: SyncLogger): void {
   const base = config.Destination.BaseCommit;
   const replayBranch = config.Destination.Branches.Replay;

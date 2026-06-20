@@ -1,5 +1,6 @@
 import type { ReplayEntry } from '../types/replay-entry.ts';
 import type { SyncConfig } from './config.ts';
+import { testGitAncestor } from './git.ts';
 
 export function compareReplayRank(left: ReplayEntry, right: ReplayEntry): number {
   if (left.CommitterDateUnix !== right.CommitterDateUnix) {
@@ -59,6 +60,28 @@ export function getReplayAgeCutoffUnix(config: SyncConfig, nowUnix = Math.floor(
     ? 5
     : config.Replay.MinReplayAgeMinutes;
   return nowUnix - minutes * 60;
+}
+
+export function testReplayCheckpointSafe(input: {
+  Queue: ReplayEntry[];
+  Index: number;
+  LastPortsSha: string | null;
+  LastPortsMingwSha: string | null;
+  MirrorPorts: string;
+  MirrorMingw: string;
+}): boolean {
+  const remaining = input.Queue.slice(input.Index + 1);
+  for (const entry of remaining) {
+    const mirrorPath = entry.SourceId === 'ports' ? input.MirrorPorts : input.MirrorMingw;
+    const cursorSha = entry.SourceId === 'ports' ? input.LastPortsSha : input.LastPortsMingwSha;
+    if (!cursorSha) {
+      continue;
+    }
+    if (!testGitAncestor(mirrorPath, cursorSha, entry.Sha)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function filterReplayQueueByAge(

@@ -11,6 +11,9 @@ export interface ReplayCheckpoint {
   LastPortsMingwSha: string | null;
   ReplayTipSha: string | null;
   ProcessedCount: number;
+  RunStartPortsSha?: string | null;
+  RunStartPortsMingwSha?: string | null;
+  IsFullReplay?: boolean;
   UpdatedAt: string;
 }
 
@@ -38,6 +41,9 @@ export function saveReplayCheckpoint(input: {
   LastPortsMingwSha: string | null;
   ReplayTipSha: string | null;
   ProcessedCount: number;
+  RunStartPortsSha: string | null;
+  RunStartPortsMingwSha: string | null;
+  IsFullReplay: boolean;
 }): void {
   const payload: ReplayCheckpoint = {
     ReplaySpecVersion: input.Config.ReplaySpecVersion,
@@ -46,6 +52,9 @@ export function saveReplayCheckpoint(input: {
     LastPortsMingwSha: input.LastPortsMingwSha,
     ReplayTipSha: input.ReplayTipSha,
     ProcessedCount: input.ProcessedCount,
+    RunStartPortsSha: input.RunStartPortsSha,
+    RunStartPortsMingwSha: input.RunStartPortsMingwSha,
+    IsFullReplay: input.IsFullReplay,
     UpdatedAt: new Date().toISOString()
   };
   writeJsonFile(getReplayCheckpointPath(input.WorkDirectory), payload);

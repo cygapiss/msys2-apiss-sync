@@ -456,17 +456,26 @@ Full rebuild: `--clean` then sync. Incremental at same tips adds zero commits.
 ### Resume checkpoint
 
 Interrupted runs (dry-run or real replay) save progress to
-`.work/cache/replay-log/replay-checkpoint.json` (every N entries, default tunable in code):
+`.work/cache/replay-log/replay-checkpoint.json` at **fork-safe** queue positions only
+(when every remaining entry from each source descends from that source cursor in the
+mirror). All three destination branches (`upstream`, `upstream-ports`,
+`upstream-ports-mingw`) are updated together after every queue entry; the checkpoint
+file may lag during parallel-branch replay.
 
 | Field | Purpose |
 |-------|---------|
-| `LastPortsSha` / `LastPortsMingwSha` | Upstream cursors for the next retrieve |
+| `LastPortsSha` / `LastPortsMingwSha` | Upstream cursors after last processed entry |
 | `ReplayTipSha` | Destination `upstream` tip after last committed replay (real sync only) |
-| `ProcessedCount` | Total entries processed across runs |
+| `ProcessedCount` | Total entries processed across runs (index into run-start queue on resume) |
+| `RunStartPortsSha` / `RunStartPortsMingwSha` | Cursors at run start; used to rebuild the full merged queue on resume |
+| `IsFullReplay` | Whether age gate was skipped for this run |
 | `DryRun` | Must match the resumed run (`--dry-run` or not) |
 | `ReplaySpecVersion` | Must match `config/sync.json` |
 
-Re-run with `--resume` (and the same `--dry-run` setting). Retrieve rebuilds the queue from checkpoint cursors, so only remaining entries are processed. `--clean` or `--clear-checkpoint` deletes the file. Successful completion clears it automatically.
+Re-run with `--resume` (and the same `--dry-run` setting). Resume rebuilds the merged
+queue from run-start cursors, slices off `ProcessedCount` entries, and checks out
+`upstream` from the local branch tip. `--clean` or `--clear-checkpoint` deletes the
+file. Successful completion clears it automatically.
 
 Dry-run does not modify the destination index or create commits; it only diffs upstream trees to detect empty skips.
 

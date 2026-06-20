@@ -45,6 +45,15 @@ export function runGitText(repoPath: string | null, gitArgs: string[]): string {
   return runGitInternal(repoPath, gitArgs, undefined, {}, 1);
 }
 
+export function testGitAncestor(repoPath: string, ancestor: string, descendant: string): boolean {
+  try {
+    runGit(repoPath, ['merge-base', '--is-ancestor', ancestor, descendant]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function streamGitText(repoPath: string | null, gitArgs: string[], env: GitEnv = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = repoPath ? ['-C', repoPath, ...gitArgs] : gitArgs;

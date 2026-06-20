@@ -3,7 +3,7 @@ import { clearReplayCheckpoint, getReplayCheckpoint, saveReplayCheckpoint } from
 import { getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
-import { filterReplayQueueByAge, mergeReplayCommitQueues } from '../lib/queue.ts';
+import { filterReplayQueueByAge, mergeReplayCommitQueues, testReplayCheckpointSafe } from '../lib/queue.ts';
 import {
   clearDestinationSyncBranches,
   ensureDestinationBaseCommit,
@@ -12,9 +12,9 @@ import {
   initializeDestinationRepository,
   initializeMirrorRepository,
   pushDestinationBranches,
-  setDestinationBranchSha,
   setDestinationReplayCheckout,
-  testAllSyncBranchesExist
+  testAllSyncBranchesExist,
+  updateDestinationSyncBranchRefs
 } from '../lib/repos.ts';
 import {
   applyUpstreamCommitToIndex,
@@ -91,6 +91,9 @@ async function main(): Promise<void> {
     let cursorMingw = getDestinationBranchSha(destPath, cursorMingwBranch);
     let isFullReplay = !testAllSyncBranchesExist(destPath, config);
     const checkpoint = resume ? getReplayCheckpoint(work) : null;
+    let runStartPorts: string | null = cursorPorts;
+    let runStartMingw: string | null = cursorMingw;
+    let runStartFullReplay = isFullReplay;
 
     if (resume) {
       if (!checkpoint) {
@@ -102,6 +105,13 @@ async function main(): Promise<void> {
       } else {
         cursorPorts = checkpoint.LastPortsSha;
         cursorMingw = checkpoint.LastPortsMingwSha;
+        if (checkpoint.RunStartPortsSha !== undefined) {
+          runStartPorts = checkpoint.RunStartPortsSha;
+          runStartMingw = checkpoint.RunStartPortsMingwSha ?? null;
+          runStartFullReplay = checkpoint.IsFullReplay ?? isFullReplay;
+        } else {
+          logger.write('Checkpoint missing run-start cursors; resume may re-queue forked commits.', 'Warn');
+        }
         logger.write(`Resume: continuing after ${checkpoint.ProcessedCount} processed entry(ies)`);
       }
     }
@@ -112,26 +122,42 @@ async function main(): Promise<void> {
       logger.write(`Incremental: cursors ports=${cursorPorts.slice(0, 8)} mingw=${cursorMingw.slice(0, 8)}`);
     }
 
-    if (checkpoint?.ReplayTipSha && !dryRun) {
-      runGit(destPath, ['checkout', '-B', replayBranch, checkpoint.ReplayTipSha]);
-      isFullReplay = false;
+    if (!dryRun) {
+      const replayTipSha = getDestinationBranchSha(destPath, replayBranch) ?? checkpoint?.ReplayTipSha ?? null;
+      if (replayTipSha) {
+        runGit(destPath, ['checkout', '-B', replayBranch, replayTipSha]);
+        isFullReplay = false;
+      } else {
+        setDestinationReplayCheckout(destPath, config, isFullReplay);
+      }
     } else {
       setDestinationReplayCheckout(destPath, config, isFullReplay);
     }
 
+    const retrievePortsAfter = resume && checkpoint?.RunStartPortsSha !== undefined ? runStartPorts : cursorPorts;
+    const retrieveMingwAfter = resume && checkpoint?.RunStartPortsSha !== undefined ? runStartMingw : cursorMingw;
     const tipPorts = getMirrorTipSha(mirrorPorts, config.Sources.Ports.Branch);
     const tipMingw = getMirrorTipSha(mirrorMingw, config.Sources.PortsMingw.Branch);
     const [portsList, mingwList] = await Promise.all([
-      getSourceReplayHistory('Ports', config, mirrorPorts, cursorPorts, tipPorts),
-      getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursorMingw, tipMingw)
+      getSourceReplayHistory('Ports', config, mirrorPorts, retrievePortsAfter, tipPorts),
+      getSourceReplayHistory('PortsMingw', config, mirrorMingw, retrieveMingwAfter, tipMingw)
     ]);
     let queue = mergeReplayCommitQueues(portsList, mingwList);
 
     logger.write(`Retrieved ports=${portsList.length} mingw=${mingwList.length} merged=${queue.length}`);
 
-    if (!isFullReplay) {
+    const ageGateFullReplay = resume && checkpoint?.RunStartPortsSha !== undefined ? runStartFullReplay : isFullReplay;
+    if (!ageGateFullReplay) {
       queue = filterReplayQueueByAge(queue, config, (message) => logger.write(message));
       logger.write(`After age gate: ${queue.length} commit(s)`);
+    }
+
+    if (resume && checkpoint && checkpoint.RunStartPortsSha !== undefined) {
+      if (checkpoint.ProcessedCount > queue.length) {
+        throw new Error(`Checkpoint ProcessedCount ${checkpoint.ProcessedCount} exceeds rebuilt queue length ${queue.length}.`);
+      }
+      queue = queue.slice(checkpoint.ProcessedCount);
+      logger.write(`Resume queue slice: ${queue.length} remaining entry(ies)`);
     }
 
     if (queue.length === 0) {
@@ -151,7 +177,7 @@ async function main(): Promise<void> {
     let lastPortsSha = cursorPorts;
     let lastMingwSha = cursorMingw;
     let replayed = 0;
-    const priorProcessed = checkpoint ? checkpoint.ProcessedCount : 0;
+    const priorProcessed = resume && checkpoint ? checkpoint.ProcessedCount : 0;
     const skipEmpty = Boolean(config.Replay.SkipEmptyTreeDiff);
 
     for (let index = 0; index < queue.length; index++) {
@@ -198,16 +224,37 @@ async function main(): Promise<void> {
         lastMingwSha = entry.Sha;
       }
 
-      const replayTipSha = dryRun ? null : runGitText(destPath, ['rev-parse', 'HEAD']).trim();
-      saveReplayCheckpoint({
-        WorkDirectory: work,
-        Config: config,
-        DryRun: dryRun,
+      if (!dryRun) {
+        const replayTipSha = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
+        updateDestinationSyncBranchRefs(destPath, config, {
+          ReplayTipSha: replayTipSha,
+          PortsSha: lastPortsSha,
+          PortsMingwSha: lastMingwSha
+        });
+      }
+
+      if (testReplayCheckpointSafe({
+        Queue: queue,
+        Index: index,
         LastPortsSha: lastPortsSha,
         LastPortsMingwSha: lastMingwSha,
-        ReplayTipSha: replayTipSha,
-        ProcessedCount: priorProcessed + index + 1
-      });
+        MirrorPorts: mirrorPorts,
+        MirrorMingw: mirrorMingw
+      })) {
+        const replayTipSha = dryRun ? checkpoint?.ReplayTipSha ?? null : runGitText(destPath, ['rev-parse', 'HEAD']).trim();
+        saveReplayCheckpoint({
+          WorkDirectory: work,
+          Config: config,
+          DryRun: dryRun,
+          LastPortsSha: lastPortsSha,
+          LastPortsMingwSha: lastMingwSha,
+          ReplayTipSha: replayTipSha,
+          ProcessedCount: priorProcessed + index + 1,
+          RunStartPortsSha: runStartPorts,
+          RunStartPortsMingwSha: runStartMingw,
+          IsFullReplay: runStartFullReplay
+        });
+      }
 
       if ((index + 1) % 100 === 0) {
         logger.write(`Progress: ${priorProcessed + index + 1} total (${index + 1} this run, ${replayed} replayed)`);
@@ -227,13 +274,11 @@ async function main(): Promise<void> {
     }
 
     const replayTip = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
-    setDestinationBranchSha(destPath, replayBranch, replayTip);
-    if (lastPortsSha) {
-      setDestinationBranchSha(destPath, cursorPortsBranch, lastPortsSha);
-    }
-    if (lastMingwSha) {
-      setDestinationBranchSha(destPath, cursorMingwBranch, lastMingwSha);
-    }
+    updateDestinationSyncBranchRefs(destPath, config, {
+      ReplayTipSha: replayTip,
+      PortsSha: lastPortsSha,
+      PortsMingwSha: lastMingwSha
+    });
 
     logger.write(`Replayed ${replayed} commit(s); tip=${replayTip.slice(0, 8)}`);
     logger.write('Pushing destination branches');
