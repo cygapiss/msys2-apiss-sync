@@ -4,6 +4,16 @@ import { runGitText, streamGitText } from './git.ts';
 
 export type CommitParentMap = Map<string, readonly string[]>;
 
+const gitEmptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+export function getFirstParentFromMap(parentMap: CommitParentMap, commit: string): string {
+  const parents = parentMap.get(commit);
+  if (!parents || parents.length === 0) {
+    return gitEmptyTree;
+  }
+  return parents[0]!;
+}
+
 export function compareReplayRank(left: ReplayEntry, right: ReplayEntry): number {
   if (left.CommitterDateUnix !== right.CommitterDateUnix) {
     return Math.sign(left.CommitterDateUnix - right.CommitterDateUnix);

@@ -1,6 +1,16 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
 
-import { getReplaySortRank, mergeReplayCommitQueues } from '../../src/lib/queue.ts';
+import { getFirstParent } from '../../src/lib/replay.ts';
+import {
+  buildMirrorCommitParentMap,
+  getFirstParentFromMap,
+  getReplaySortRank,
+  mergeReplayCommitQueues
+} from '../../src/lib/queue.ts';
 import type { ReplayEntry } from '../../src/types/replay-entry.ts';
 
 function newTestQueueItem(input: {
@@ -32,6 +42,55 @@ function newTestQueueItem(input: {
     })
   };
 }
+
+function runGit(repoPath: string, args: string[]): string {
+  const result = spawnSync('git', ['-C', repoPath, ...args], {
+    encoding: 'utf8',
+    windowsHide: true
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stderr || result.stdout).trim());
+  }
+  return result.stdout;
+}
+
+function initTestRepo(repoPath: string): void {
+  spawnSync('git', ['init', '-b', 'master', repoPath], {
+    encoding: 'utf8',
+    windowsHide: true
+  });
+  runGit(repoPath, ['config', 'user.name', 'Test User']);
+  runGit(repoPath, ['config', 'user.email', 'test@example.com']);
+}
+
+describe('getFirstParentFromMap', () => {
+  test('matches git rev-list for commits on the branch', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-uwp-sync-parent-map-'));
+    try {
+      const mirrorPath = join(root, 'mirror');
+      initTestRepo(mirrorPath);
+
+      const firstPath = join(mirrorPath, 'first.txt');
+      mkdirSync(dirname(firstPath), { recursive: true });
+      writeFileSync(firstPath, 'first\n', 'utf8');
+      runGit(mirrorPath, ['add', 'first.txt']);
+      runGit(mirrorPath, ['commit', '-m', 'first']);
+      const first = runGit(mirrorPath, ['rev-parse', 'HEAD']).trim();
+
+      writeFileSync(join(mirrorPath, 'second.txt'), 'second\n', 'utf8');
+      runGit(mirrorPath, ['add', 'second.txt']);
+      runGit(mirrorPath, ['commit', '-m', 'second']);
+      const second = runGit(mirrorPath, ['rev-parse', 'HEAD']).trim();
+
+      const parentMap = await buildMirrorCommitParentMap(mirrorPath, 'master');
+
+      expect(getFirstParentFromMap(parentMap, second)).toBe(getFirstParent(mirrorPath, second));
+      expect(getFirstParentFromMap(parentMap, first)).toBe(getFirstParent(mirrorPath, first));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('mergeReplayCommitQueues', () => {
   test('preserves git order within each source while merging source heads', () => {

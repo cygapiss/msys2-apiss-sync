@@ -5,6 +5,7 @@ import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../l
 import {
   buildMirrorCommitParentMap,
   filterReplayQueueByAge,
+  getFirstParentFromMap,
   mergeReplayCommitQueues,
   precomputeReplayCursorBranchSafeFlags
 } from '../lib/queue.ts';
@@ -26,7 +27,6 @@ import {
 import {
   applyUpstreamCommitToIndex,
   formatReplayCommitMessage,
-  getFirstParent,
   newReplayCommit,
   testUpstreamCommitHasMappedChanges
 } from '../lib/replay.ts';
@@ -158,11 +158,12 @@ async function main(): Promise<void> {
     for (let index = 0; index < queue.length; index++) {
       const entry = queue[index]!;
       const mirrorPath = entry.SourceId === 'ports' ? mirrorPorts : entry.SourceId === 'ports-mingw' ? mirrorMingw : null;
-      if (!mirrorPath) {
+      const parentMap = entry.SourceId === 'ports' ? parentMapPorts : entry.SourceId === 'ports-mingw' ? parentMapMingw : null;
+      if (!mirrorPath || !parentMap) {
         throw new Error(`Unknown SourceId on queue entry: ${entry.SourceId}`);
       }
 
-      const parent = getFirstParent(mirrorPath, entry.Sha);
+      const parent = getFirstParentFromMap(parentMap, entry.Sha);
       const message = formatReplayCommitMessage({
         SortKey: entry.SortKey,
         Metadata: entry,
