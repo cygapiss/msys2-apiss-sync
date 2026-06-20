@@ -271,7 +271,9 @@ async function main(): Promise<void> {
       }
 
       if ((index + 1) % 100 === 0) {
-        logger.write(`Progress: ${index + 1} (${replayed} replayed)`);
+        const processed = index + 1;
+        const remaining = queue.length - processed;
+        logger.write(`Progress: ${processed}/${queue.length} (${replayed} replayed, ${remaining} remaining)`);
       }
     }
 
