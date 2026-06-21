@@ -4,6 +4,9 @@ name: Mirror sync from upstream
 # Copy to: sync/.github/workflows/mirror-sync.yml
 # master holds upstream package history only; do not commit workflows to master.
 # Set repository variable UPSTREAM_REPO (e.g. msys2/MSYS2-packages).
+# MSYS2-packages: event-type msys2-packages-updated
+# MINGW-packages: event-type mingw-packages-updated
+# Dispatches msys2-apiss-sync after push (GITHUB_TOKEN pushes do not trigger on:push workflows).
 
 on:
   schedule:
@@ -23,6 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sync from upstream
+        id: sync
         env:
           UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
         run: |
@@ -34,13 +38,31 @@ jobs:
           AFTER="$(git rev-parse upstream/master)"
           if [ -n "$BEFORE" ] && [ "$BEFORE" = "$AFTER" ]; then
             echo "No upstream changes."
+            echo "advanced=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Advanced mirror from ${BEFORE:-<none>} to ${AFTER}"
+          echo "advanced=true" >> "$GITHUB_OUTPUT"
+          echo "sha=${AFTER}" >> "$GITHUB_OUTPUT"
 
       - name: Push mirror
+        if: steps.sync.outputs.advanced == 'true'
         run: |
           if git push origin upstream/master:master; then
             exit 0
           fi
           git push --force-with-lease origin upstream/master:master
+
+      - name: Notify msys2-apiss-sync
+        if: steps.sync.outputs.advanced == 'true'
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.SYNC_DISPATCH_TOKEN }}
+          repository: msys2-apiss/msys2-apiss-sync
+          event-type: upstream-updated
+          client-payload: >-
+            {
+              "source": "${{ github.repository }}",
+              "sha": "${{ steps.sync.outputs.sha }}",
+              "ref": "refs/heads/master"
+            }
