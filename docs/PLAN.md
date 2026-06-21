@@ -627,7 +627,7 @@ Edit in git only when values change (rare).
 
 Mirror repos use branch **`sync`** (default) for workflow YAML only; **`master`** is a
 pure fast-forward copy of upstream `master` with no workflow commits. Templates:
-`docs/examples/mirror-sync.yml`, `docs/examples/mirror-dispatch.yml`.
+`docs/examples/mirror-sync.yml`.
 | `Replay.*` | Age gate, tree/message rules |
 | `PollIntervalMinutes` | Hourly tolerance poll (60 -> cron `0 * * * *`) |
 | `DailyReconciliationCron` | Daily gap-check schedule |
@@ -730,12 +730,13 @@ GitHub Actions requires static cron in YAML; workflow comments reference sync.js
 
 | Branch | Role |
 |--------|------|
-| `sync` (default) | `.github/workflows/mirror-sync.yml`, `mirror-dispatch.yml` |
+| `sync` (default) | `.github/workflows/mirror-sync.yml` |
 | `master` | Pure upstream mirror; no workflow files |
 
 `mirror-sync.yml` fetches upstream `master` and pushes `upstream/master` to
-`origin/master` without mutating the `sync` checkout. `mirror-dispatch.yml` fires on
-`push` to `master` and dispatches `upstream-updated` to `msys2-apiss/msys2-apiss-sync`.
+`origin/master` without mutating the `sync` checkout, then dispatches
+`msys2-apiss/msys2-apiss-sync` when master advances. Manual replay: `workflow_dispatch`
+on `msys2-apiss-sync`.
 
 ### [`sync-upstream.yml`](../.github/workflows/sync-upstream.yml) changes
 
