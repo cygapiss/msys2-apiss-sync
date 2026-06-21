@@ -21,6 +21,7 @@ yarn apply-mirror-patch --skip-fetch \
 yarn apply-mirror-patch --skip-fetch `
   --source ports `
   --range c266c35b..28bfcc09 `
+  --branch apply-ports-test `
   --destination-path .work/destination/msys2-apiss `
   --create-commit
 ```
@@ -28,13 +29,13 @@ yarn apply-mirror-patch --skip-fetch `
 Or use a **single line** (recommended on Windows):
 
 ```powershell
-yarn apply-mirror-patch --skip-fetch --source ports --range c266c35b9f59efb8ff387b81d1013d29e09d2939..28bfcc090b6f5ee082fe3de3e7234e8fd1a13de4 --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --range c266c35b9f59efb8ff387b81d1013d29e09d2939..28bfcc090b6f5ee082fe3de3e7234e8fd1a13de4 --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 Quote the range if PowerShell mis-parses `..`:
 
 ```powershell
-yarn apply-mirror-patch --skip-fetch --source ports --range "c266c35b..28bfcc09" --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --range "c266c35b..28bfcc09" --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 Git `-C` works the same in PowerShell:
@@ -104,11 +105,33 @@ git -C .work/mirrors/MINGW-packages rev-parse master
 ## Command
 
 ```bash
-yarn apply-mirror-patch --source <ports|ports-mingw> --commit <sha> --destination-path <path>
+yarn apply-mirror-patch --source <ports|ports-mingw> --commit <sha> --branch <new-branch> --destination-path <path>
 ```
 
 `--source` also accepts `MSYS2-packages`, `MINGW-packages`, `Ports`, and
 `PortsMingw`.
+
+## Branch: keep `upstream` intact
+
+When applying to a destination clone, you **must** pass `--branch` with a **new**
+branch name. The tool checks out that branch from the current `upstream` tip
+(or `--base-branch`) and applies patches there. The `upstream` branch ref is
+not moved.
+
+```bash
+yarn apply-mirror-patch --skip-fetch --source ports --commit aac3de01 --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
+```
+
+| Flag | Purpose |
+|------|---------|
+| `--branch` | New local branch to create and check out (required for index apply) |
+| `--base-branch` | Branch to fork from (default: `upstream` from `config/sync.json`) |
+
+Rules:
+
+- `--branch` must not equal `--base-branch` (default `upstream`).
+- The new branch must not already exist locally (delete it first to retry).
+- `--print-patch` and `--list-files` do not need `--branch` (no destination checkout).
 
 ## Stage one commit
 
@@ -116,13 +139,13 @@ Same index logic as `yarn sync` (no destination commit unless
 `--create-commit`):
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --commit aac3de01 --destination-path .work/destination/msys2-apiss
+yarn apply-mirror-patch --skip-fetch --source ports --commit aac3de01 --branch apply-ports-test --destination-path .work/destination/msys2-apiss
 ```
 
 MINGW mirror:
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports-mingw --commit <sha> --destination-path .work/destination/msys2-apiss
+yarn apply-mirror-patch --skip-fetch --source ports-mingw --commit <sha> --branch apply-mingw-test --destination-path .work/destination/msys2-apiss
 ```
 
 Without `--create-commit`, changes are staged only. Inspect with:
@@ -158,7 +181,7 @@ Use **either** `--range` **or** `--commit`, never both in one run.
 ### Repeated `--commit` = explicit list (not a range)
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --commit abc123 --commit def456 --destination-path .work/destination/msys2-apiss
+yarn apply-mirror-patch --skip-fetch --source ports --commit abc123 --commit def456 --branch apply-ports-test --destination-path .work/destination/msys2-apiss
 ```
 
 This applies **exactly those SHAs** and nothing else:
@@ -176,7 +199,7 @@ Use this when you want a small, hand-picked set of upstream commits.
 ### `--range A..B` = git revision range
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --range abc123..def456 --destination-path .work/destination/msys2-apiss
+yarn apply-mirror-patch --skip-fetch --source ports --range abc123..def456 --branch apply-ports-test --destination-path .work/destination/msys2-apiss
 ```
 
 This runs `git rev-list --reverse A..B` on the mirror. It uses normal **git
@@ -234,13 +257,13 @@ Without `--create-commit`, each apply resets the index from `HEAD`
 before the next one runs:
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --range abc123..def456 --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --range abc123..def456 --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 Same for an explicit list:
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --commit abc123 --commit def456 --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --commit abc123 --commit def456 --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 Single-commit staging (no `--create-commit`) is fine when you only pass one
@@ -251,13 +274,13 @@ Single-commit staging (no `--create-commit`) is fine when you only pass one
 Oldest-first git order (`rev-list --reverse`):
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --range abc123..def456 --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --range abc123..def456 --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 Explicit list (two commits only, not everything between them):
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --commit abc123 --commit def456 --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --commit abc123 --commit def456 --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 ## Stage and create a replay commit
@@ -266,7 +289,7 @@ Preserves upstream author/committer name, email, and dates; message uses the
 same template as full sync:
 
 ```bash
-yarn apply-mirror-patch --skip-fetch --source ports --commit <sha> --destination-path .work/destination/msys2-apiss --create-commit
+yarn apply-mirror-patch --skip-fetch --source ports --commit <sha> --branch apply-ports-test --destination-path .work/destination/msys2-apiss --create-commit
 ```
 
 ## Flags
@@ -274,6 +297,8 @@ yarn apply-mirror-patch --skip-fetch --source ports --commit <sha> --destination
 | Flag | Purpose |
 |------|---------|
 | `--source` | `ports`, `ports-mingw`, or mirror/repo alias (required) |
+| `--branch` | New local branch to create from `--base-branch` (required for index apply) |
+| `--base-branch` | Branch to fork from (default: `upstream`) |
 | `--commit` | One upstream mirror SHA; repeat for an explicit list (not a range) |
 | `--range` | Git two-dot range `A..B`: A exclusive, B inclusive, oldest first |
 | `--destination-path` | Destination clone path (required for index apply) |

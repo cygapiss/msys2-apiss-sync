@@ -21,7 +21,7 @@ import {
   formatReplayCommitMessage,
   newReplayCommit
 } from '../lib/replay.ts';
-import { initializeDestinationAlternates, initializeMirrorRepository } from '../lib/repos.ts';
+import { initializeDestinationAlternates, checkoutNewDestinationBranchFromBase, initializeMirrorRepository } from '../lib/repos.ts';
 
 function readRepeatedOption(args: string[], name: string): string[] {
   const values: string[] = [];
@@ -79,6 +79,16 @@ async function main(): Promise<void> {
     const createCommit = readFlag(args, '--create-commit');
     const outputPath = readStringOption(args, '--output');
     const parentOverride = readStringOption(args, '--parent');
+    const branchName = readStringOption(args, '--branch');
+    const baseBranchName = readStringOption(args, '--base-branch') ?? config.Destination.Branches.Replay;
+    const modifiesDestination = !printPatch && !listFiles;
+
+    if (modifiesDestination && !branchName) {
+      throw new Error(`Missing --branch (required; ${baseBranchName} is left unchanged)`);
+    }
+    if (branchName && branchName === baseBranchName) {
+      throw new Error(`--branch must not be ${baseBranchName}; use a new branch name`);
+    }
 
     if (printPatch && listFiles) {
       throw new Error('Use either --print-patch or --list-files, not both');
@@ -107,6 +117,10 @@ async function main(): Promise<void> {
     });
     const mirrorPath = source.SourceKey === 'Ports' ? mirrorPorts : mirrorMingw;
     initializeDestinationAlternates(destinationPath, [mirrorPorts, mirrorMingw]);
+
+    if (modifiesDestination && branchName) {
+      checkoutNewDestinationBranchFromBase(destinationPath, branchName, baseBranchName, logger);
+    }
 
     const commitShas = Range ? listMirrorCommitShas(mirrorPath, Range) : Commits;
     if (commitShas.length === 0) {
@@ -191,6 +205,9 @@ async function main(): Promise<void> {
 
     if (!printPatch && !listFiles) {
       logger.write(`Done. applied=${applied} skipped=${skipped}`);
+      if (branchName) {
+        logger.write(`Branch ${branchName} updated; ${baseBranchName} unchanged.`);
+      }
       if (applied > 0 && !createCommit) {
         logger.write('Changes are staged in the destination index (git diff --cached).');
       }

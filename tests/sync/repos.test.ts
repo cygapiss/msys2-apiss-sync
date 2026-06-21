@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
 
-import { checkoutDestinationReplayBranch, resolveUpstreamCursorSha, setDestinationBranchSha } from '../../src/lib/repos.ts';
+import { checkoutDestinationReplayBranch, checkoutNewDestinationBranchFromBase, resolveUpstreamCursorSha, setDestinationBranchSha } from '../../src/lib/repos.ts';
+import type { SyncLogger } from '../../src/lib/log.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
 
 function runGit(repoPath: string, args: string[]): string {
@@ -70,6 +71,58 @@ describe('setDestinationBranchSha', () => {
 
       expect(runGit(repoPath, ['rev-parse', 'HEAD']).trim()).toBe(first);
       expect(runGit(repoPath, ['rev-parse', 'upstream-ports']).trim()).toBe(second);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('checkoutNewDestinationBranchFromBase', () => {
+  const logger: SyncLogger = {
+    write() {},
+    close() {}
+  };
+
+  test('creates a new branch from base without moving base', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-repos-new-branch-'));
+    try {
+      const repoPath = join(root, 'repo');
+      initTestRepo(repoPath);
+
+      writeFileSync(join(repoPath, 'first.txt'), 'first\n', 'utf8');
+      runGit(repoPath, ['add', 'first.txt']);
+      runGit(repoPath, ['commit', '-m', 'first']);
+      const first = runGit(repoPath, ['rev-parse', 'HEAD']).trim();
+
+      writeFileSync(join(repoPath, 'second.txt'), 'second\n', 'utf8');
+      runGit(repoPath, ['add', 'second.txt']);
+      runGit(repoPath, ['commit', '-m', 'second']);
+      const second = runGit(repoPath, ['rev-parse', 'HEAD']).trim();
+
+      runGit(repoPath, ['branch', '-f', 'upstream', second]);
+      runGit(repoPath, ['checkout', '-B', 'upstream', second]);
+
+      checkoutNewDestinationBranchFromBase(repoPath, 'apply-test', 'upstream', logger);
+
+      expect(runGit(repoPath, ['symbolic-ref', '--short', 'HEAD']).trim()).toBe('apply-test');
+      expect(runGit(repoPath, ['rev-parse', 'HEAD']).trim()).toBe(second);
+      expect(runGit(repoPath, ['rev-parse', 'upstream']).trim()).toBe(second);
+      expect(first).not.toBe(second);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects reusing the base branch name', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-repos-new-branch-reject-'));
+    try {
+      const repoPath = join(root, 'repo');
+      initTestRepo(repoPath);
+      runGit(repoPath, ['commit', '--allow-empty', '-m', 'base']);
+      runGit(repoPath, ['checkout', '-B', 'upstream']);
+
+      expect(() => checkoutNewDestinationBranchFromBase(repoPath, 'upstream', 'upstream', logger))
+        .toThrow('--branch must not be upstream');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

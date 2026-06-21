@@ -119,6 +119,37 @@ export function checkoutDestinationReplayBranch(
   runGit(destinationPath, ['reset', '--hard', 'HEAD']);
 }
 
+export function resolveDestinationBranchSha(destinationPath: string, branchName: string): string | null {
+  return getLocalDestinationBranchSha(destinationPath, branchName)
+    ?? getDestinationBranchSha(destinationPath, branchName);
+}
+
+export function checkoutNewDestinationBranchFromBase(
+  destinationPath: string,
+  branchName: string,
+  baseBranchName: string,
+  logger: SyncLogger
+): string {
+  const protectedNames = new Set([baseBranchName]);
+  if (protectedNames.has(branchName)) {
+    throw new Error(`--branch must not be ${baseBranchName}; use a new branch name`);
+  }
+  if (getLocalDestinationBranchSha(destinationPath, branchName)) {
+    throw new Error(`Branch ${branchName} already exists locally; choose a new name or delete it`);
+  }
+
+  const baseSha = resolveDestinationBranchSha(destinationPath, baseBranchName);
+  if (!baseSha) {
+    throw new Error(`Missing base branch ${baseBranchName} in destination clone`);
+  }
+
+  prepareDestinationWorkingTree(destinationPath);
+  runGit(destinationPath, ['checkout', '-b', branchName, baseSha]);
+  runGit(destinationPath, ['reset', '--hard', 'HEAD']);
+  logger.write(`Checked out new branch ${branchName} from ${baseBranchName} (${baseSha.slice(0, 8)})`);
+  return baseSha;
+}
+
 export function setDestinationReplayCheckout(
   destinationPath: string,
   config: SyncConfig,
