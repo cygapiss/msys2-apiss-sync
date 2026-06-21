@@ -7,10 +7,9 @@ name: Mirror sync from upstream
 # MSYS2-packages: event-type msys2-packages-updated
 # MINGW-packages: event-type mingw-packages-updated
 # Dispatches msys2-apiss-sync after push (GITHUB_TOKEN pushes do not trigger on:push workflows).
+# Schedule: msys2-apiss-sync mirror-poll.yml triggers this via workflow_dispatch.
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:

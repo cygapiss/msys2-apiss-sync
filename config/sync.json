@@ -30,7 +30,7 @@
     "Owner": "msys2-apiss",
     "Ports": "MSYS2-packages",
     "PortsMingw": "MINGW-packages",
-    "SyncIntervalMinutes": 5,
+    "SyncIntervalMinutes": 15,
     "DispatchEventType": "upstream-updated"
   },
   "Replay": {

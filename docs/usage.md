@@ -16,8 +16,7 @@ Requires the [GitHub CLI](https://cli.github.com/) (`gh auth login`) with access
 
 ### 1. Refresh mirrors from upstream
 
-Run on branch `sync` (workflows live there, not on `master`). Run both mirrors, or
-only the repo that changed.
+Mirrors auto-refresh every ~15 minutes via [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on this repo (GitHub per-repo `*/5` cron is unreliable). Manual trigger on branch `sync` (workflows live there, not on `master`):
 
 ```bash
 gh workflow run mirror-sync.yml --repo msys2-apiss/MSYS2-packages --ref sync

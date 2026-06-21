@@ -598,7 +598,7 @@ Edit in git only when values change (rare).
     "Owner": "msys2-apiss",
     "Ports": "MSYS2-packages",
     "PortsMingw": "MINGW-packages",
-    "SyncIntervalMinutes": 5,
+    "SyncIntervalMinutes": 15,
     "DispatchEventType": "upstream-updated"
   },
   "Replay": {
@@ -715,10 +715,11 @@ CI reads timing and repo constants from [`config/sync.json`](../config/sync.json
 
 | sync.json key | Value | Workflow mapping |
 |---------------|-------|------------------|
+| `Mirrors.SyncIntervalMinutes` | `15` | [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) cron: `7,22,37,52 * * * *` |
 | `PollIntervalMinutes` | `60` | Tolerance poll cron: `0 * * * *` |
 | `DailyReconciliationCron` | `'0 3 * * *'` | Daily reconciliation cron (same string in YAML) |
 
-GitHub Actions requires static cron in YAML; workflow comments reference sync.json as source of truth. Preflight step logs both values via `loadSyncConfig`.
+GitHub Actions requires static cron in YAML; workflow comments reference sync.json as source of truth. Preflight step logs both values via `loadSyncConfig`. Do not put cron on mirror repos; GitHub `*/5` schedules are often skipped. [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on this repo triggers `workflow_dispatch` on each mirror instead.
 
 ### Mirror repos (`msys2-apiss/MSYS2-packages`, `msys2-apiss/MINGW-packages`)
 
@@ -728,7 +729,7 @@ GitHub Actions requires static cron in YAML; workflow comments reference sync.js
 | `master` | Pure upstream mirror; no workflow files |
 
 `mirror-sync.yml` on branch `sync` fast-forwards `master` from upstream and dispatches
-`msys2-apiss-sync` when master advances. Manual steps: [`usage.md`](usage.md).
+`msys2-apiss-sync` when master advances. Triggered by [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml), manual `workflow_dispatch`, or [`usage.md`](usage.md).
 
 ### [`sync-upstream.yml`](../.github/workflows/sync-upstream.yml) changes
 
