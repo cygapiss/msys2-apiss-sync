@@ -238,6 +238,13 @@ describe('repairSyncBranchLayout', () => {
       const syncOnly = runGit(repoPath, ['rev-list', '--count', 'sync', '^origin/master']).trim();
       expect(syncOnly).toBe('1');
       expect(runGit(repoPath, ['rev-parse', 'sync^']).trim()).toBe(masterRoot);
+      expect(runGit(repoPath, ['log', '-1', '--format=%s', 'sync']).trim()).toBe(
+        'Mirror sync workflow from msys2-apiss-sync'
+      );
+      expect(runGit(repoPath, ['log', '-1', '--format=%b', 'sync']).trim()).toBe(
+        'https://github.com/msys2-apiss/msys2-apiss-sync/tree/main/config/mirror-sync\n' +
+          'https://github.com/msys2-apiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml'
+      );
       expect(runGit(repoPath, ['rev-parse', 'sync:.github/workflows/mirror-sync.yml']).trim()).toBeTruthy();
     } finally {
       rmSync(root, { recursive: true, force: true });

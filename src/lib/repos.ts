@@ -17,6 +17,27 @@ import type { SyncLogger } from './log.ts';
 
 export const MIRROR_SYNC_BRANCH = 'sync';
 
+export const MIRROR_SYNC_COMMIT_MESSAGE =
+  'Mirror sync workflow from msys2-apiss-sync\n\n' +
+  'https://github.com/msys2-apiss/msys2-apiss-sync/tree/main/config/mirror-sync\n' +
+  'https://github.com/msys2-apiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml';
+
+function commitTreeWithMessage(
+  mirrorPath: string,
+  treeSha: string,
+  parent: string,
+  message: string
+): string {
+  const lines = message.split('\n');
+  const subject = lines[0] ?? message;
+  const body = lines.slice(1).join('\n').trim();
+  const args = ['commit-tree', treeSha, '-p', parent, '-m', subject];
+  if (body) {
+    args.push('-m', body);
+  }
+  return runGitText(mirrorPath, args).trim();
+}
+
 function refExists(mirrorPath: string, ref: string): boolean {
   try {
     runGitText(mirrorPath, ['rev-parse', '--verify', ref]);
@@ -94,15 +115,12 @@ export function repairSyncBranchLayout(
   }
 
   const root = firstCommitOfBranch(mirrorPath, originContent);
-  const message =
-    options?.CommitMessage ??
-    (runGitText(mirrorPath, ['log', '-1', '--format=%s', MIRROR_SYNC_BRANCH]).trim() ||
-      'Mirror sync workflow');
+  const message = options?.CommitMessage ?? MIRROR_SYNC_COMMIT_MESSAGE;
 
   runGit(mirrorPath, ['read-tree', root], {}, 5, logger);
   runGit(mirrorPath, ['read-tree', '--prefix=.github', githubSubTree], {}, 5, logger);
   const treeSha = runGitText(mirrorPath, ['write-tree']).trim();
-  const newCommit = runGitText(mirrorPath, ['commit-tree', treeSha, '-p', root, '-m', message]).trim();
+  const newCommit = commitTreeWithMessage(mirrorPath, treeSha, root, message);
   runGit(mirrorPath, ['clean', '-fd'], {}, 5, logger);
   runGit(mirrorPath, ['checkout', '-B', MIRROR_SYNC_BRANCH, newCommit], {}, 5, logger);
   logger.write(

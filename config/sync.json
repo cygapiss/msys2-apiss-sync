@@ -32,6 +32,7 @@
     "PortsMingw": "MINGW-packages",
     "MingwW64": "mingw-w64",
     "Glibc": "glibc",
+    "BinutilsGdb": "binutils-gdb",
     "Enscript": "enscript",
     "SyncIntervalMinutes": 15,
     "DispatchEventType": "upstream-updated"
@@ -43,6 +44,10 @@
     },
     "Glibc": {
       "UpstreamUrl": "https://sourceware.org/git/glibc.git",
+      "Branch": "master"
+    },
+    "BinutilsGdb": {
+      "UpstreamUrl": "https://sourceware.org/git/binutils-gdb.git",
       "Branch": "master"
     },
     "Enscript": {

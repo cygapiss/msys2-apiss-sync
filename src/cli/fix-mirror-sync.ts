@@ -96,6 +96,7 @@ async function main(): Promise<void> {
     const work = getWorkDirectory(repoRoot);
     const skipFetch = readFlag(args, '--skip-fetch');
     const push = readFlag(args, '--push');
+    const force = readFlag(args, '--force');
     const repoFilter = readStringOption(args, '--repo');
     const message = readStringOption(args, '--message');
 
@@ -122,7 +123,8 @@ async function main(): Promise<void> {
 
       ensureMirrorPath(work, config, repoName, true, logger);
       const repaired = repairSyncBranchLayout(mirrorPath, contentBranch, logger, {
-        CommitMessage: message
+        CommitMessage: message,
+        Force: force
       });
       if (!repaired) {
         logger.write(`${repoName}: ${MIRROR_SYNC_BRANCH} layout already valid`);

@@ -36,7 +36,10 @@ git -C .work/mirrors/my-tool checkout -B sync "$ROOT"
 # applied by yarn fetch-mirrors from config/mirror-sync/*.json and
 # config/mirror-template/mirror-sync.yml
 git -C .work/mirrors/my-tool add .github
-git -C .work/mirrors/my-tool commit -m "Mirror sync workflow"
+git -C .work/mirrors/my-tool commit \
+  -m "Mirror sync workflow from msys2-apiss-sync" \
+  -m "https://github.com/msys2-apiss/msys2-apiss-sync/tree/main/config/mirror-sync
+https://github.com/msys2-apiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml"
 git -C .work/mirrors/my-tool push --force-with-lease origin sync
 ```
 
@@ -61,7 +64,8 @@ yarn fix-mirror-sync --skip-fetch --repo glibc --push
 | `--repo <name>` | One mirror (default: all in `config/sync.json`) |
 | `--skip-fetch` | Keep local `.github/` edits; do not reset to `origin/sync` |
 | `--push` | Push repaired `sync` to GitHub (`--force-with-lease`) |
-| `--message <text>` | Commit message (default: previous `sync` tip subject) |
+| `--force` | Re-squash `sync` even when layout is already valid |
+| `--message <text>` | Commit message (default: subject + links to [config/mirror-sync](https://github.com/msys2-apiss/msys2-apiss-sync/tree/main/config/mirror-sync) and [mirror-sync.yml](https://github.com/msys2-apiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml)) |
 
 ## Local mirror path
 
