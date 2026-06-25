@@ -33,6 +33,7 @@
     "MingwW64": "mingw-w64",
     "Glibc": "glibc",
     "BinutilsGdb": "binutils-gdb",
+    "Elfutils": "elfutils",
     "Enscript": "enscript",
     "SyncIntervalMinutes": 15,
     "DispatchEventType": "upstream-updated"
@@ -49,6 +50,10 @@
     "BinutilsGdb": {
       "UpstreamUrl": "https://sourceware.org/git/binutils-gdb.git",
       "Branch": "master"
+    },
+    "Elfutils": {
+      "UpstreamUrl": "https://sourceware.org/git/elfutils.git",
+      "Branch": "main"
     },
     "Enscript": {
       "UpstreamUrl": "https://git.savannah.gnu.org/git/enscript.git",

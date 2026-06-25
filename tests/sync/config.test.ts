@@ -12,6 +12,7 @@ describe('getMirrorPollRepoNames', () => {
       'mingw-w64',
       'glibc',
       'binutils-gdb',
+      'elfutils',
       'enscript'
     ]);
   });

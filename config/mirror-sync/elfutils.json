@@ -1,0 +1,9 @@
+{
+  "UpstreamUrl": "https://sourceware.org/git/elfutils.git",
+  "Branches": [
+    { "Upstream": "main", "Mirror": "main" }
+  ],
+  "Notify": {
+    "Enabled": false
+  }
+}
