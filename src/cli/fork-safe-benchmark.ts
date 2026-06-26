@@ -45,8 +45,8 @@ async function main(): Promise<void> {
   }
 
   const totalStart = performance.now();
-  const portsPath = resolveCachePath(cacheDir, 'Ports', portsCachePath ?? null);
-  const mingwPath = resolveCachePath(cacheDir, 'PortsMingw', mingwCachePath ?? null);
+  const portsPath = resolveCachePath(cacheDir, 'ports', portsCachePath ?? null);
+  const mingwPath = resolveCachePath(cacheDir, 'ports-mingw', mingwCachePath ?? null);
 
   for (const [label, cachePath] of [['ports', portsPath], ['mingw', mingwPath]] as const) {
     let lastReport = -1;

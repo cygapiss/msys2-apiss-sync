@@ -60,8 +60,12 @@ manual runs queue until the current run finishes.
 
 ## Secrets
 
-- `MSYS2_APISS_SYNC_TOKEN`: write access to `msys2-apiss/msys2-apiss` and this repo
-- `SYNC_DISPATCH_TOKEN`: every mirror repo; PAT with `repo` + `workflow` for
+- `MSYS2_APISS_SYNC_TOKEN`: **`msys2-apiss/msys2-apiss-sync` only** (not mirror
+  repos). Write access to `msys2-apiss/msys2-apiss` and this repo; used by
+  `sync-upstream.yml`, `mirror-poll.yml`, and local `yarn mirror-poll` /
+  `yarn fetch-mirrors --push-sync` bootstrap (via env or `GITHUB_TOKEN` from
+  `gh auth`).
+- `SYNC_DISPATCH_TOKEN`: **each mirror repo**; PAT with `repo` + `workflow` for
   checkout, workflow_dispatch, and repository_dispatch to `msys2-apiss-sync`
 - `MIRROR_PUSH_SSH_KEY`: mirror repos with `PushViaSsh` true; deploy key for
   `git@github.com` push (avoids HTTPS HTTP/2 failures on large repos)

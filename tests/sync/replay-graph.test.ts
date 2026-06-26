@@ -44,7 +44,7 @@ describe('replay-graph cache', () => {
         ['c2', ['c1']],
         ['c1', []]
       ]);
-      const cachePath = getMirrorParentGraphCachePath(root, 'Ports', 'master', 'c3');
+      const cachePath = getMirrorParentGraphCachePath(root, 'ports', 'master', 'c3');
       saveMirrorParentGraph(cachePath, 'master', 'c3', parentMap);
 
       const loaded = loadMirrorParentGraph(cachePath);
@@ -100,7 +100,7 @@ describe('fork-safe flags from saved graph', () => {
       const right = runGit(['rev-parse', 'HEAD']).trim();
 
       const parentMap = buildCommitParentMapForShas(mirrorPath, [base, left, right]);
-      const cachePath = getMirrorParentGraphCachePath(root, 'Ports', 'master', right);
+      const cachePath = getMirrorParentGraphCachePath(root, 'ports', 'master', right);
       saveMirrorParentGraph(cachePath, 'master', right, parentMap);
       const loaded = loadMirrorParentGraph(cachePath)!;
 

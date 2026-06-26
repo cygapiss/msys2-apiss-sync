@@ -86,7 +86,7 @@ describe('saved parent map cache', () => {
 
     const portsCachePath = getMirrorParentGraphCachePath(
       cacheDir,
-      'Ports',
+      'ports',
       'master',
       'aac3de013fac752c5d052883f4de45b574005bc2'
     );

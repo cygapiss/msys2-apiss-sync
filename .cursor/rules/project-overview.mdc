@@ -7,13 +7,13 @@ alwaysApply: true
 
 ## Purpose
 
-Replay upstream commit history from `msys2/MSYS2-packages` and `msys2/MINGW-packages`
-into `msys2-apiss/msys2-apiss` on branch `upstream`.
+Replay commit history from synced mirrors `msys2-apiss/MSYS2-packages` and
+`msys2-apiss/MINGW-packages` into `msys2-apiss/msys2-apiss` on branch `upstream`.
 
 ## Path mapping
 
-- `msys2/MSYS2-packages` -> `ports/`
-- `msys2/MINGW-packages` -> `ports-mingw/`
+- `msys2-apiss/MSYS2-packages` -> `ports/`
+- `msys2-apiss/MINGW-packages` -> `ports-mingw/`
 
 ## Base commit
 

@@ -1,35 +1,21 @@
-import type { SourceKey } from '../types/replay-entry.ts';
 import { getSourceConfigEntry, type SyncConfig } from './config.ts';
 import { runGitText } from './git.ts';
 import { convertToUnixLineEndings } from './log.ts';
 import { getDiffTreeEntries, getFirstParent } from './replay.ts';
 
 export interface ResolvedMirrorSource {
-  SourceKey: SourceKey;
+  SourceId: string;
   DestSubdir: string;
   SortKey: string;
 }
 
 export function resolveMirrorSourceFromCli(input: string, config: SyncConfig): ResolvedMirrorSource {
-  const normalized = input.trim();
-  for (const sourceKey of ['Ports', 'PortsMingw'] as const) {
-    const entry = getSourceConfigEntry(config, sourceKey);
-    const aliases = [
-      sourceKey,
-      entry.SortKey,
-      entry.Repo,
-      entry.Repo.toLowerCase(),
-      `${entry.Owner}/${entry.Repo}`
-    ];
-    if (aliases.includes(normalized)) {
-      return {
-        SourceKey: sourceKey,
-        DestSubdir: entry.DestSubdir,
-        SortKey: entry.SortKey
-      };
-    }
-  }
-  throw new Error(`Unknown --source ${input}; use ports or ports-mingw`);
+  const entry = getSourceConfigEntry(config, input);
+  return {
+    SourceId: entry.SortKey,
+    DestSubdir: entry.DestSubdir,
+    SortKey: entry.SortKey
+  };
 }
 
 function mapDiffGitPath(path: string, destSubdir: string): string {

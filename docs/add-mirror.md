@@ -98,10 +98,10 @@ yarn fetch-mirrors --skip-fetch --push-sync   # apply and push sync when local d
 
 ## Mirror-only vs package mirror
 
-| Kind | Replay into `msys2-apiss` | `config/sync.json` |
-|------|---------------------------|-------------------|
-| Package mirror | yes (`ports/` or `ports-mingw/`) | `Sources.*` + `Mirrors.Ports` / `Mirrors.PortsMingw` |
-| Mirror-only | no | `Mirrors.<Key>` + `MirrorOnly.<Key>` |
+| Kind | Replay into `msys2-apiss` | Registration |
+|------|---------------------------|----------------|
+| Package mirror | yes (`ports/` or `ports-mingw/`) | `Sources.*` + name in `Mirrors.Repos` + `config/mirror-sync/<repo>.json` |
+| Mirror-only | no | entry in `Mirrors.Repos` + `config/mirror-sync/<repo>.json` |
 
 Use mirror-only for upstream repos that are mirrored on GitHub but not replayed
 into the destination (e.g. `mingw-w64`, `glibc`).
@@ -116,45 +116,50 @@ Create `config/mirror-sync/my-tool.json` (copy from `glibc.json` or
 ```json
 {
   "UpstreamUrl": "https://example.com/upstream.git",
+  "Url": "https://example.com/upstream",
+  "Description": "My upstream tool",
   "Branches": [{ "Upstream": "master", "Mirror": "master" }],
   "Notify": { "Enabled": false }
 }
 ```
 
-Register the repo in `config/sync.json` (`Mirrors` + `MirrorOnly`). Example
-`MirrorOnly` entry still needs `UpstreamUrl` and `Branch` for this repo's
-fetch/poll metadata:
+Register the repo name in `config/sync.json` `Mirrors.Repos`:
 
 ```json
-"Mirrors": { "MyTool": "my-tool" },
-"MirrorOnly": {
-  "MyTool": {
-    "UpstreamUrl": "https://example.com/upstream.git",
-    "Branch": "master"
-  }
+"Mirrors": {
+  "Repos": [
+    "MSYS2-packages",
+    "MINGW-packages",
+    "my-tool"
+  ],
+  "SyncIntervalMinutes": 15,
+  "DispatchEventType": "upstream-updated"
 }
 ```
 
-### 2. Create GitHub mirror repo
+Top-level `"Owner": "msys2-apiss"` applies to all mirror repos and the destination.
 
-1. Create empty repo `msys2-apiss/my-tool` on GitHub.
-2. Run bootstrap (fetches upstream commit graph blob:none, checks out root only,
-   pushes content branch + `sync`, registers workflow, runs first sync, restores
-   default branch):
+All mirror metadata (`UpstreamUrl`, `Url`, `Description`, branches, notify)
+lives in `config/mirror-sync/<repo-name>.json` only.
+
+### 2. Bootstrap on GitHub
+
+Run (creates the GitHub repo with `gh` when missing, pushes content root +
+`sync`, registers workflow, runs first sync, restores default branch):
 
 ```bash
-yarn fetch-mirrors --skip-fetch --push-sync
+yarn fetch-mirrors --repo my-tool --push-sync
 ```
 
-For an empty GitHub mirror this clones only the **root commit** of the upstream
-content branch locally, pushes that as `master`/`main`, pushes `sync`, triggers
-`mirror-sync` on GitHub (full upstream fetch happens in CI), waits for that run,
-then sets default back to the content branch.
+This fetches upstream commit graph blob:none, checks out the root commit only
+locally, pushes that as `master`/`main`, pushes `sync`, triggers `mirror-sync`
+on GitHub (full upstream fetch happens in CI), waits for that run, then sets
+default back to the content branch.
 
-3. `yarn fetch-mirrors` clones into `.work/mirrors/my-tool/` on branch **`sync`**
-   and applies `config/mirror-sync/my-tool.json` when the mirror already exists.
+Later, `yarn fetch-mirrors` clones into `.work/mirrors/my-tool/` on branch
+**`sync`** and applies `config/mirror-sync/my-tool.json` when templates differ.
 
-4. Re-push workflow templates after config edits:
+Re-push workflow templates after config edits:
 
 ```bash
 yarn fetch-mirrors --skip-fetch --push-sync
@@ -189,7 +194,7 @@ Remove manual copy steps for templates; edit `config/mirror-sync/*.json` in
 msys2-apiss-sync, re-run `yarn fetch-mirrors --skip-fetch --push-sync`.
 
 `mirror-poll.yml` on `msys2-apiss-sync` picks up any repo listed in
-`config/sync.json` (`Mirrors.*` + `MirrorOnly.*`).
+`Mirrors.Repos`.
 
 ### 3. Local squash / workflow edits
 

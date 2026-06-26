@@ -7,6 +7,7 @@ import { describe, expect, test } from 'vitest';
 import { getSyncRepoRoot, loadSyncConfig } from '../../src/lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../../src/lib/history.ts';
 import { mergeReplayCommitQueues } from '../../src/lib/queue.ts';
+import { DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE } from '../../src/lib/config.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
 import {
   initializeDestinationAlternates,
@@ -70,6 +71,7 @@ function commitDestinationReplay(
   writeFileSync(fullPath, `${relativePath}\n`, 'utf8');
   runGit(destPath, ['add', relativePath]);
   const message = formatReplayCommitMessage({
+    Template: DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE,
     SortKey: input.SortKey,
     Metadata: { Subject: input.Subject, Body: '' },
     UpstreamRepo: input.UpstreamRepo,
@@ -115,10 +117,8 @@ describe('resolveSyncRetrieveCursorsFromBranches', () => {
       setDestinationRemoteBranch(destPath, 'upstream-ports-mingw', mingwDestSha);
 
       expect(resolveSyncRetrieveCursorsFromBranches(destPath, config)).toEqual({
-        PortsDestSha: portsDestSha,
-        PortsMingwDestSha: mingwDestSha,
-        PortsUpstreamSha: portsUpstreamSha,
-        PortsMingwUpstreamSha: mingwUpstreamSha
+        ports: { DestSha: portsDestSha, UpstreamSha: portsUpstreamSha },
+        'ports-mingw': { DestSha: mingwDestSha, UpstreamSha: mingwUpstreamSha }
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -133,10 +133,8 @@ describe('resolveSyncRetrieveCursorsFromBranches', () => {
       runGit(destPath, ['commit', '--allow-empty', '-m', 'base']);
 
       expect(resolveSyncRetrieveCursorsFromBranches(destPath, config)).toEqual({
-        PortsDestSha: null,
-        PortsMingwDestSha: null,
-        PortsUpstreamSha: null,
-        PortsMingwUpstreamSha: null
+        ports: { DestSha: null, UpstreamSha: null },
+        'ports-mingw': { DestSha: null, UpstreamSha: null }
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -195,14 +193,14 @@ describe('branch-based resume retrieve', () => {
       setDestinationRemoteBranch(destPath, 'upstream-ports-mingw', mingwReplayOne);
 
       const cursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
-      expect(cursors.PortsUpstreamSha).toBe(portsTwo);
-      expect(cursors.PortsMingwUpstreamSha).toBe(mingwOne);
+      expect(cursors.ports?.UpstreamSha).toBe(portsTwo);
+      expect(cursors['ports-mingw']?.UpstreamSha).toBe(mingwOne);
 
       const tipPorts = getMirrorTipSha(mirrorPorts, 'master');
       const tipMingw = getMirrorTipSha(mirrorMingw, 'master');
       const [portsList, mingwList] = await Promise.all([
-        getSourceReplayHistory('Ports', config, mirrorPorts, cursors.PortsUpstreamSha, tipPorts),
-        getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursors.PortsMingwUpstreamSha, tipMingw)
+        getSourceReplayHistory('ports', config, mirrorPorts, cursors.ports?.UpstreamSha ?? null, tipPorts),
+        getSourceReplayHistory('ports-mingw', config, mirrorMingw, cursors['ports-mingw']?.UpstreamSha ?? null, tipMingw)
       ]);
 
       expect(portsList.map((entry) => entry.Sha)).toEqual([portsThree]);
@@ -259,8 +257,8 @@ describe('branch-based resume retrieve', () => {
 
       const cursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
       const [portsList, mingwList] = await Promise.all([
-        getSourceReplayHistory('Ports', config, mirrorPorts, cursors.PortsUpstreamSha, getMirrorTipSha(mirrorPorts, 'master')),
-        getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursors.PortsMingwUpstreamSha, getMirrorTipSha(mirrorMingw, 'master'))
+        getSourceReplayHistory('ports', config, mirrorPorts, cursors.ports?.UpstreamSha ?? null, getMirrorTipSha(mirrorPorts, 'master')),
+        getSourceReplayHistory('ports-mingw', config, mirrorMingw, cursors['ports-mingw']?.UpstreamSha ?? null, getMirrorTipSha(mirrorMingw, 'master'))
       ]);
 
       expect(portsList.map((entry) => entry.Sha)).toEqual([portsPending]);

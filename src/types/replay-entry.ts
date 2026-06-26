@@ -1,5 +1,3 @@
-export type SourceKey = 'Ports' | 'PortsMingw';
-
 export interface ReplayEntry {
   Sha: string;
   SourceId: string;

@@ -1,75 +1,50 @@
 {
   "ReplaySpecVersion": 4,
+  "Owner": "msys2-apiss",
   "Destination": {
-    "Owner": "msys2-apiss",
     "Repo": "msys2-apiss",
     "BaseCommit": "6fc20894663468a04dd4986a8b1c15a9d5ae8649",
-    "Branches": {
-      "Replay": "upstream",
-      "CursorPorts": "upstream-ports",
-      "CursorPortsMingw": "upstream-ports-mingw"
-    }
+    "ReplayTip": "upstream"
   },
-  "Sources": {
-    "Ports": {
-      "Owner": "msys2",
+  "Sources": [
+    {
       "Repo": "MSYS2-packages",
       "Branch": "master",
       "DestSubdir": "ports",
-      "SortKey": "ports"
+      "SortKey": "ports",
+      "CursorBranch": "upstream-ports",
+      "UpstreamRepo": "msys2/MSYS2-packages",
+      "CommitMessage": "[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}"
     },
-    "PortsMingw": {
-      "Owner": "msys2",
+    {
       "Repo": "MINGW-packages",
       "Branch": "master",
       "DestSubdir": "ports-mingw",
-      "SortKey": "ports-mingw"
+      "SortKey": "ports-mingw",
+      "CursorBranch": "upstream-ports-mingw",
+      "UpstreamRepo": "msys2/MINGW-packages",
+      "CommitMessage": "[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}"
     }
-  },
+  ],
   "Mirrors": {
-    "Owner": "msys2-apiss",
-    "Ports": "MSYS2-packages",
-    "PortsMingw": "MINGW-packages",
-    "MingwW64": "mingw-w64",
-    "Glibc": "glibc",
-    "BinutilsGdb": "binutils-gdb",
-    "Elfutils": "elfutils",
-    "Gcc": "gcc",
-    "Enscript": "enscript",
+    "Repos": [
+      "MSYS2-packages",
+      "MINGW-packages",
+      "mingw-w64",
+      "glibc",
+      "binutils-gdb",
+      "elfutils",
+      "gcc",
+      "enscript",
+      "aports"
+    ],
     "SyncIntervalMinutes": 15,
     "DispatchEventType": "upstream-updated"
-  },
-  "MirrorOnly": {
-    "MingwW64": {
-      "UpstreamUrl": "https://git.code.sf.net/p/mingw-w64/mingw-w64",
-      "Branch": "master"
-    },
-    "Glibc": {
-      "UpstreamUrl": "https://sourceware.org/git/glibc.git",
-      "Branch": "master"
-    },
-    "BinutilsGdb": {
-      "UpstreamUrl": "https://sourceware.org/git/binutils-gdb.git",
-      "Branch": "master"
-    },
-    "Elfutils": {
-      "UpstreamUrl": "https://sourceware.org/git/elfutils.git",
-      "Branch": "main"
-    },
-    "Gcc": {
-      "UpstreamUrl": "https://gcc.gnu.org/git/gcc.git",
-      "Branch": "master"
-    },
-    "Enscript": {
-      "UpstreamUrl": "https://git.savannah.gnu.org/git/enscript.git",
-      "Branch": "master"
-    }
   },
   "Replay": {
     "MinReplayAgeMinutes": 5,
     "SkipEmptyTreeDiff": true,
-    "LineEnding": "LF",
-    "CommitMessagePrefix": true
+    "LineEnding": "LF"
   },
   "PollIntervalMinutes": 60,
   "DailyReconciliationCron": "0 3 * * *"

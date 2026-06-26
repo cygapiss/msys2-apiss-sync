@@ -2,18 +2,15 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  getMirrorOnlyEntryForRepo,
   getMirrorPollRepoNames,
-  getSourceConfigEntry,
   getSyncRepoRoot,
   loadSyncConfig
 } from '../lib/config.ts';
 import { getMirrorTipSha } from '../lib/history.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
 import { runGitText } from '../lib/git.ts';
-import { bootstrapMirrorWorkflowIfToken } from '../lib/mirror-poll.ts';
+import { bootstrapMirrorWorkflowIfToken, getMirrorContentBranch } from '../lib/mirror-poll.ts';
 import {
-  initializeMirrorRepository,
   initializeNamedMirrorRepository,
   MIRROR_SYNC_BRANCH,
   pushMirrorContentBranch,
@@ -22,49 +19,18 @@ import {
 } from '../lib/repos.ts';
 import { readFlag, readStringOption } from './args.ts';
 
-function contentBranchForRepo(
-  config: ReturnType<typeof loadSyncConfig>,
-  repoName: string
-): string {
-  if (repoName === config.Mirrors.Ports) {
-    return getSourceConfigEntry(config, 'Ports').Branch;
-  }
-  if (repoName === config.Mirrors.PortsMingw) {
-    return getSourceConfigEntry(config, 'PortsMingw').Branch;
-  }
-  const entry = getMirrorOnlyEntryForRepo(config, repoName);
-  return entry?.Branch ?? 'master';
-}
-
 function ensureMirrorPath(
   work: string,
   config: ReturnType<typeof loadSyncConfig>,
+  repoRoot: string,
   repoName: string,
   skipFetch: boolean,
   logger: ReturnType<typeof createSyncLogger>
 ): string {
-  if (repoName === config.Mirrors.Ports) {
-    return initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'Ports',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
-  }
-  if (repoName === config.Mirrors.PortsMingw) {
-    return initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'PortsMingw',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
-  }
   return initializeNamedMirrorRepository({
     WorkDirectory: work,
     RepoName: repoName,
-    ContentBranch: contentBranchForRepo(config, repoName),
+    ContentBranch: getMirrorContentBranch(repoRoot, repoName),
     Config: config,
     SkipFetch: skipFetch,
     Logger: logger
@@ -113,17 +79,17 @@ async function main(): Promise<void> {
     logger.write('Repairing mirror sync branch layout');
 
     for (const repoName of repoNames) {
-      const contentBranch = contentBranchForRepo(config, repoName);
+      const contentBranch = getMirrorContentBranch(repoRoot, repoName);
       const mirrorPath = join(work, 'mirrors', repoName);
       const needsClone = !existsSync(mirrorPath);
 
       if (needsClone || !skipFetch) {
-        ensureMirrorPath(work, config, repoName, false, logger);
+        ensureMirrorPath(work, config, repoRoot, repoName, false, logger);
         logMirrorTips(logger, repoName, mirrorPath, contentBranch);
         continue;
       }
 
-      ensureMirrorPath(work, config, repoName, true, logger);
+      ensureMirrorPath(work, config, repoRoot, repoName, true, logger);
       const repaired = repairSyncBranchLayout(mirrorPath, contentBranch, logger, {
         CommitMessage: message,
         Force: force
@@ -137,7 +103,7 @@ async function main(): Promise<void> {
           pushMirrorSyncBranch(mirrorPath, repoName, logger);
         }
         await bootstrapMirrorWorkflowIfToken({
-          Owner: config.Mirrors.Owner,
+          Owner: config.Owner,
           RepoName: repoName,
           ContentBranch: contentBranch,
           Logger: logger,

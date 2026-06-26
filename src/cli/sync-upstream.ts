@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 import { runGitText, runGit } from '../lib/git.ts';
-import { getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
+import { getSourceConfigEntry, getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
 import {
@@ -11,7 +11,8 @@ import {
   filterReplayQueueByAge,
   getFirstParentFromMap,
   mergeReplayCommitQueues,
-  precomputeReplayCursorBranchSafeFlags
+  precomputeReplayCursorBranchSafeFlags,
+  type CommitParentMap
 } from '../lib/queue.ts';
 import {
   advanceSyncCursorDestShasIfSafe,
@@ -59,24 +60,23 @@ async function main(): Promise<void> {
     const skipFetch = readFlag(args, '--skip-fetch');
     const maxCommits = readIntOption(args, '--max-commits', 0);
     const destinationPathArg = readStringOption(args, '--destination-path');
-    const replayBranch = config.Destination.Branches.Replay;
+    const replayBranch = config.Destination.ReplayTip;
 
     logger.write(`Sync-Upstream start (clean=${clean} dryRun=${dryRun} skipFetch=${skipFetch})`);
 
-    const mirrorPorts = initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'Ports',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
-    const mirrorMingw = initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'PortsMingw',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
+    const mirrorPaths = new Map<string, string>();
+    for (const source of config.Sources) {
+      mirrorPaths.set(
+        source.SortKey,
+        initializeMirrorRepository({
+          WorkDirectory: work,
+          Source: source,
+          Config: config,
+          SkipFetch: skipFetch,
+          Logger: logger
+        })
+      );
+    }
     const destPath = initializeDestinationRepository({
       WorkDirectory: work,
       Config: config,
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
       Logger: logger
     });
 
-    initializeDestinationAlternates(destPath, [mirrorPorts, mirrorMingw]);
+    initializeDestinationAlternates(destPath, [...mirrorPaths.values()]);
     ensureDestinationBaseCommit(destPath, config, logger);
 
     if (clean) {
@@ -93,29 +93,32 @@ async function main(): Promise<void> {
       clearDestinationSyncBranches(destPath, config, logger);
     }
 
-    let portsDestSha: string | null = null;
-    let mingwDestSha: string | null = null;
-    let cursorPorts: string | null = null;
-    let cursorMingw: string | null = null;
+    const lastDestShas: Record<string, string | null> = Object.fromEntries(
+      config.Sources.map((source) => [source.SortKey, null])
+    );
+    const upstreamCursors: Record<string, string | null> = Object.fromEntries(
+      config.Sources.map((source) => [source.SortKey, null])
+    );
     let isFullReplay: boolean;
 
     if (clean) {
       isFullReplay = true;
     } else {
       const retrieveCursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
-      portsDestSha = retrieveCursors.PortsDestSha;
-      mingwDestSha = retrieveCursors.PortsMingwDestSha;
-      cursorPorts = retrieveCursors.PortsUpstreamSha;
-      cursorMingw = retrieveCursors.PortsMingwUpstreamSha;
+      for (const source of config.Sources) {
+        lastDestShas[source.SortKey] = retrieveCursors[source.SortKey]?.DestSha ?? null;
+        upstreamCursors[source.SortKey] = retrieveCursors[source.SortKey]?.UpstreamSha ?? null;
+      }
       isFullReplay = !testAllSyncBranchesExist(destPath, config);
     }
-    let lastPortsDestSha = portsDestSha;
-    let lastMingwDestSha = mingwDestSha;
 
     if (isFullReplay) {
       logger.write('Bootstrap: full replay (no age gate)');
-    } else if (cursorPorts && cursorMingw) {
-      logger.write(`Incremental: cursors ports=${cursorPorts.slice(0, 8)} mingw=${cursorMingw.slice(0, 8)}`);
+    } else {
+      const cursorSummary = config.Sources
+        .map((source) => `${source.SortKey}=${(upstreamCursors[source.SortKey] ?? 'none').slice(0, 8)}`)
+        .join(' ');
+      logger.write(`Incremental: cursors ${cursorSummary}`);
     }
 
     if (!dryRun) {
@@ -132,15 +135,28 @@ async function main(): Promise<void> {
       setDestinationReplayCheckout(destPath, config, isFullReplay);
     }
 
-    const tipPorts = getMirrorTipSha(mirrorPorts, config.Sources.Ports.Branch);
-    const tipMingw = getMirrorTipSha(mirrorMingw, config.Sources.PortsMingw.Branch);
-    const [portsList, mingwList] = await Promise.all([
-      getSourceReplayHistory('Ports', config, mirrorPorts, cursorPorts, tipPorts),
-      getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursorMingw, tipMingw)
-    ]);
-    let queue = mergeReplayCommitQueues(portsList, mingwList);
+    const historyLists = await Promise.all(
+      config.Sources.map(async (source) => {
+        const mirrorPath = mirrorPaths.get(source.SortKey)!;
+        const tip = getMirrorTipSha(mirrorPath, source.Branch);
+        const history = await getSourceReplayHistory(
+          source.SortKey,
+          config,
+          mirrorPath,
+          upstreamCursors[source.SortKey],
+          tip
+        );
+        return history;
+      })
+    );
+    let queue = mergeReplayCommitQueues(...historyLists);
 
-    logger.write(`Retrieved ports=${portsList.length} mingw=${mingwList.length} merged=${queue.length}`);
+    const historyCounts = Object.fromEntries(
+      config.Sources.map((source, index) => [source.SortKey, historyLists[index]!.length])
+    );
+    logger.write(
+      `Retrieved ${config.Sources.map((source) => `${source.SortKey}=${historyCounts[source.SortKey]}`).join(' ')} merged=${queue.length}`
+    );
 
     if (!isFullReplay) {
       queue = filterReplayQueueByAge(queue, config, (message) => logger.write(message));
@@ -159,33 +175,28 @@ async function main(): Promise<void> {
     }
 
     const graphCacheDir = join(work, 'cache', 'replay-graph');
-    const [parentMapPorts, parentMapMingw] = await Promise.all([
-      loadOrBuildMirrorCommitParentMap({
-        CachePath: getMirrorParentGraphCachePath(graphCacheDir, 'Ports', config.Sources.Ports.Branch, tipPorts),
-        Branch: config.Sources.Ports.Branch,
-        TipSha: tipPorts,
-        Build: () => buildMirrorCommitParentMap(mirrorPorts, config.Sources.Ports.Branch)
-      }),
-      loadOrBuildMirrorCommitParentMap({
-        CachePath: getMirrorParentGraphCachePath(
-          graphCacheDir,
-          'PortsMingw',
-          config.Sources.PortsMingw.Branch,
-          tipMingw
-        ),
-        Branch: config.Sources.PortsMingw.Branch,
-        TipSha: tipMingw,
-        Build: () => buildMirrorCommitParentMap(mirrorMingw, config.Sources.PortsMingw.Branch)
+    const parentMaps: Record<string, CommitParentMap> = {};
+    await Promise.all(
+      config.Sources.map(async (source) => {
+        const mirrorPath = mirrorPaths.get(source.SortKey)!;
+        const tip = getMirrorTipSha(mirrorPath, source.Branch);
+        parentMaps[source.SortKey] = await loadOrBuildMirrorCommitParentMap({
+          CachePath: getMirrorParentGraphCachePath(graphCacheDir, source.SortKey, source.Branch, tip),
+          Branch: source.Branch,
+          TipSha: tip,
+          Build: () => buildMirrorCommitParentMap(mirrorPath, source.Branch)
+        });
       })
-    ]);
+    );
+    const sourceEntries = Object.fromEntries(
+      config.Sources.map((source, index) => [source.SortKey, historyLists[index]!])
+    );
     const precomputeStart = performance.now();
     let lastPrecomputeReport = -1;
     const cursorBranchSafeFlags = precomputeReplayCursorBranchSafeFlags({
       Queue: queue,
-      ParentMapPorts: parentMapPorts,
-      ParentMapMingw: parentMapMingw,
-      PortsEntries: portsList,
-      PortsMingwEntries: mingwList,
+      ParentMaps: parentMaps,
+      SourceEntries: sourceEntries,
       OnSourceProgress: (sourceId, processed, total) => {
         if (processed === 0) {
           logger.write(`Precompute fork-safe flags ${sourceId}: start (${total} entries)`);
@@ -204,20 +215,21 @@ async function main(): Promise<void> {
     logger.write('Precomputed fork-safe cursor branch flags');
 
     let replayed = 0;
-    let lastPortsSha = cursorPorts;
-    let lastMingwSha = cursorMingw;
+    const lastUpstreamShas: Record<string, string | null> = { ...upstreamCursors };
     const skipEmpty = Boolean(config.Replay.SkipEmptyTreeDiff);
 
     for (let index = 0; index < queue.length; index++) {
       const entry = queue[index]!;
-      const mirrorPath = entry.SourceId === 'ports' ? mirrorPorts : entry.SourceId === 'ports-mingw' ? mirrorMingw : null;
-      const parentMap = entry.SourceId === 'ports' ? parentMapPorts : entry.SourceId === 'ports-mingw' ? parentMapMingw : null;
+      const mirrorPath = mirrorPaths.get(entry.SourceId);
+      const parentMap = parentMaps[entry.SourceId];
       if (!mirrorPath || !parentMap) {
         throw new Error(`Unknown SourceId on queue entry: ${entry.SourceId}`);
       }
 
       const parent = getFirstParentFromMap(parentMap, entry.Sha);
+      const sourceEntry = getSourceConfigEntry(config, entry.SourceId);
       const message = formatReplayCommitMessage({
+        Template: sourceEntry.CommitMessage,
         SortKey: entry.SortKey,
         Metadata: entry,
         UpstreamRepo: entry.UpstreamRepo,
@@ -250,32 +262,29 @@ async function main(): Promise<void> {
         }
       }
 
-      if (entry.SourceId === 'ports') {
-        lastPortsSha = entry.Sha;
-      } else {
-        lastMingwSha = entry.Sha;
-      }
+      lastUpstreamShas[entry.SourceId] = entry.Sha;
 
       if (!dryRun && entryReplayed) {
         const cursorBranchSafe = cursorBranchSafeFlags[index] ?? false;
         if (cursorBranchSafe) {
           const replayTipSha = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
-          const nextCursorDestShas = advanceSyncCursorDestShasIfSafe({
+          const previousDestShas = { ...lastDestShas };
+          const nextDestShas = advanceSyncCursorDestShasIfSafe({
             SourceId: entry.SourceId,
             ReplayTipSha: replayTipSha,
             CursorBranchSafe: cursorBranchSafe,
-            LastPortsDestSha: lastPortsDestSha,
-            LastMingwDestSha: lastMingwDestSha
+            LastDestShas: lastDestShas
           });
-          const portsDestChanged = nextCursorDestShas.PortsDestSha !== lastPortsDestSha;
-          const mingwDestChanged = nextCursorDestShas.PortsMingwDestSha !== lastMingwDestSha;
-          lastPortsDestSha = nextCursorDestShas.PortsDestSha;
-          lastMingwDestSha = nextCursorDestShas.PortsMingwDestSha;
-          if (portsDestChanged || mingwDestChanged) {
-            updateDestinationCursorBranchRefs(destPath, config, {
-              PortsDestSha: portsDestChanged ? lastPortsDestSha : null,
-              PortsMingwDestSha: mingwDestChanged ? lastMingwDestSha : null
-            });
+          const updates: Partial<Record<string, string | null>> = {};
+          for (const source of config.Sources) {
+            const nextSha = nextDestShas[source.SortKey];
+            if (nextSha !== previousDestShas[source.SortKey]) {
+              updates[source.SortKey] = nextSha;
+              lastDestShas[source.SortKey] = nextSha;
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            updateDestinationCursorBranchRefs(destPath, config, updates);
           }
         }
       }
@@ -300,8 +309,7 @@ async function main(): Promise<void> {
     const replayTip = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
     updateDestinationSyncBranchRefs(destPath, config, {
       ReplayTipSha: replayTip,
-      PortsDestSha: lastPortsDestSha,
-      PortsMingwDestSha: lastMingwDestSha
+      CursorDestShas: lastDestShas
     });
 
     logger.write(`Replayed ${replayed} commit(s); tip=${replayTip.slice(0, 8)}`);

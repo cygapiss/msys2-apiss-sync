@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
+import { getSyncRepoRoot, loadSyncConfig, resolveSourcesForCli } from '../lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment, writeJsonFile } from '../lib/log.ts';
 import { mergeReplayCommitQueues } from '../lib/queue.ts';
@@ -24,30 +24,24 @@ async function main(): Promise<void> {
 
     logger.write(`Merging queue (after=${afterSha ? afterSha.slice(0, 8) : 'full'})`);
 
-    const mirrorPorts = initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'Ports',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
-    const mirrorMingw = initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'PortsMingw',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
+    const historyLists = await Promise.all(
+      config.Sources.map(async (source) => {
+        const mirrorPath = initializeMirrorRepository({
+          WorkDirectory: work,
+          Source: source,
+          Config: config,
+          SkipFetch: skipFetch,
+          Logger: logger
+        });
+        const tip = getMirrorTipSha(mirrorPath, source.Branch);
+        const history = await getSourceReplayHistory(source.SortKey, config, mirrorPath, afterSha, tip);
+        logger.write(`${source.SortKey}: ${history.length} commit(s)`);
+        return history;
+      })
+    );
+    const queue = mergeReplayCommitQueues(...historyLists);
 
-    const tipPorts = getMirrorTipSha(mirrorPorts, config.Sources.Ports.Branch);
-    const tipMingw = getMirrorTipSha(mirrorMingw, config.Sources.PortsMingw.Branch);
-    const [portsList, mingwList] = await Promise.all([
-      getSourceReplayHistory('Ports', config, mirrorPorts, afterSha, tipPorts),
-      getSourceReplayHistory('PortsMingw', config, mirrorMingw, afterSha, tipMingw)
-    ]);
-    const queue = mergeReplayCommitQueues(portsList, mingwList);
-
-    logger.write(`ports: ${portsList.length}  mingw: ${mingwList.length}  merged: ${queue.length}`);
+    logger.write(`merged: ${queue.length}`);
     for (const entry of queue.slice(0, sampleCount)) {
       console.log(`${entry.SourceId}\t${entry.Sha.slice(0, 8)}\t${entry.CommitterDateUnix}\t${entry.Subject}`);
     }
@@ -69,9 +63,11 @@ async function main(): Promise<void> {
       })));
     }
 
+    const sourceCounts = Object.fromEntries(
+      config.Sources.map((source, index) => [source.SortKey, historyLists[index]!.length])
+    );
     writeJsonFile(outFile, {
-      PortsCount: portsList.length,
-      PortsMingwCount: mingwList.length,
+      SourceCounts: sourceCounts,
       MergedCount: queue.length,
       FullHistoryFile: fullFile,
       Sample: queue.slice(0, sampleCount).map((entry) => ({

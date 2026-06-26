@@ -15,7 +15,8 @@ and [`sync-upstream.yml`](../.github/workflows/sync-upstream.yml) automatically.
 
 Requires the [GitHub CLI](https://cli.github.com/) (`gh auth login`) with access to
 `msys2-apiss`. Each mirror repo needs `SYNC_DISPATCH_TOKEN` (see below).
-`msys2-apiss-sync` needs `MSYS2_APISS_SYNC_TOKEN`.
+`MSYS2_APISS_SYNC_TOKEN` is a secret on **`msys2-apiss/msys2-apiss-sync` only**
+(not on mirror repos).
 
 ### Setup `SYNC_DISPATCH_TOKEN` (each mirror repo)
 
@@ -161,7 +162,8 @@ mirror repos.
 
 `yarn mirror-poll` compares each mirror content branch to upstream and dispatches
 `mirror-sync` only when they differ (same logic as CI). Requires
-`MSYS2_APISS_SYNC_TOKEN` or `GITHUB_TOKEN`.
+`MSYS2_APISS_SYNC_TOKEN` (sync-repo secret) or `GITHUB_TOKEN` in the environment
+when run locally; mirror repos do not use this secret.
 
 ### Full sync (retrieve, merge, replay, push)
 

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
 
+import { DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE } from '../../src/lib/config.ts';
 import {
   applyUpstreamCommitToIndex,
   formatGitReplayDateEnv,
@@ -154,6 +155,7 @@ describe('applyUpstreamCommitToIndex', () => {
 describe('formatReplayCommitMessage', () => {
   test('formats message with body', () => {
     expect(formatReplayCommitMessage({
+      Template: DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE,
       SortKey: 'ports',
       Metadata: {
         Subject: 'update foo',
@@ -172,6 +174,7 @@ describe('formatReplayCommitMessage', () => {
 
   test('formats message without body', () => {
     expect(formatReplayCommitMessage({
+      Template: DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE,
       SortKey: 'ports-mingw',
       Metadata: {
         Subject: 'update bar',

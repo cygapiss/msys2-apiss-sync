@@ -18,6 +18,7 @@ import {
   precomputeSourceCursorBranchSafeFlags,
   testSyncCursorBranchUpdateSafe
 } from '../../src/lib/queue.ts';
+import { DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE } from '../../src/lib/config.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
 import type { ReplayEntry } from '../../src/types/replay-entry.ts';
 
@@ -85,6 +86,7 @@ function commitDestinationReplay(
     'commit',
     '-m',
     formatReplayCommitMessage({
+      Template: DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE,
       SortKey: input.SortKey,
       Metadata: { Subject: input.Subject, Body: '' },
       UpstreamRepo: input.UpstreamRepo,
@@ -212,8 +214,7 @@ describe('precomputeReplayCursorBranchSafeFlags', () => {
       const queue = [newPortsEntry(Base), newPortsEntry(Left), newPortsEntry(Right)];
       const flags = precomputeReplayCursorBranchSafeFlags({
         Queue: queue,
-        ParentMapPorts: parentMap,
-        ParentMapMingw: parentMap
+        ParentMaps: { ports: parentMap, 'ports-mingw': parentMap }
       });
 
       for (let index = 0; index < queue.length; index++) {
@@ -238,11 +239,10 @@ describe('advanceSyncCursorDestShasIfSafe', () => {
       SourceId: 'ports',
       ReplayTipSha: 'left-dest',
       CursorBranchSafe: false,
-      LastPortsDestSha: 'base-dest',
-      LastMingwDestSha: null
+      LastDestShas: { ports: 'base-dest', 'ports-mingw': null }
     })).toEqual({
-      PortsDestSha: 'base-dest',
-      PortsMingwDestSha: null
+      ports: 'base-dest',
+      'ports-mingw': null
     });
   });
 
@@ -251,11 +251,10 @@ describe('advanceSyncCursorDestShasIfSafe', () => {
       SourceId: 'ports',
       ReplayTipSha: 'right-dest',
       CursorBranchSafe: true,
-      LastPortsDestSha: 'base-dest',
-      LastMingwDestSha: null
+      LastDestShas: { ports: 'base-dest', 'ports-mingw': null }
     })).toEqual({
-      PortsDestSha: 'right-dest',
-      PortsMingwDestSha: null
+      ports: 'right-dest',
+      'ports-mingw': null
     });
   });
 });
@@ -303,15 +302,14 @@ describe('fork-safe cursor branches after abort', () => {
         SourceId: 'ports',
         ReplayTipSha: leftDestSha,
         CursorBranchSafe: false,
-        LastPortsDestSha: baseDestSha,
-        LastMingwDestSha: null
+        LastDestShas: { ports: baseDestSha, 'ports-mingw': null }
       });
-      setDestinationBranchSha(destPath, 'upstream-ports', nextCursorDestShas.PortsDestSha!);
+      setDestinationBranchSha(destPath, 'upstream-ports', nextCursorDestShas.ports!);
 
       expect(getDestinationBranchSha(destPath, 'upstream-ports')).toBe(baseDestSha);
-      expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).PortsUpstreamSha).toBe(Base);
-      expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).PortsUpstreamSha).not.toBe(Left);
-      expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).PortsUpstreamSha).not.toBe(Right);
+      expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).ports?.UpstreamSha).toBe(Base);
+      expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).ports?.UpstreamSha).not.toBe(Left);
+      expect(resolveSyncRetrieveCursorsFromBranches(destPath, config).ports?.UpstreamSha).not.toBe(Right);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -2,57 +2,38 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { SourceKey } from '../types/replay-entry.ts';
-
 export interface SourceConfigEntry {
-  Owner: string;
   Repo: string;
   Branch: string;
   DestSubdir: string;
   SortKey: string;
+  CursorBranch: string;
+  UpstreamRepo: string;
+  CommitMessage: string;
 }
 
-export interface MirrorOnlyEntry {
-  UpstreamUrl: string;
-  Branch: string;
-}
-
-export type MirrorOnlyKey = string;
-
-export function getMirrorRepoNameByKey(config: SyncConfig, key: string): string | undefined {
-  const value = (config.Mirrors as Record<string, unknown>)[key];
-  return typeof value === 'string' ? value : undefined;
-}
+export const DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE =
+  '[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}';
 
 export interface SyncConfig {
   ReplaySpecVersion: number;
+  Owner: string;
   Destination: {
-    Owner: string;
     Repo: string;
     Url?: string;
     BaseCommit: string;
-    Branches: {
-      Replay: string;
-      CursorPorts: string;
-      CursorPortsMingw: string;
-    };
+    ReplayTip: string;
   };
-  Sources: Record<SourceKey, SourceConfigEntry>;
+  Sources: SourceConfigEntry[];
   Mirrors: {
-    Owner: string;
-    Ports: string;
-    PortsMingw: string;
-    MingwW64?: string;
-    Glibc?: string;
+    Repos: string[];
     SyncIntervalMinutes: number;
     DispatchEventType: string;
   };
-  MirrorOnly?: Partial<Record<MirrorOnlyKey, MirrorOnlyEntry>>;
   Replay: {
     MinReplayAgeMinutes?: number;
     SkipEmptyTreeDiff: boolean;
     LineEnding: string;
-    CommitMessagePrefix: boolean;
   };
   PollIntervalMinutes: number;
   DailyReconciliationCron: string;
@@ -79,56 +60,47 @@ export function loadSyncConfig(repoRoot = getSyncRepoRoot(), configPath?: string
   return JSON.parse(readFileSync(path, 'utf8')) as SyncConfig;
 }
 
-export function getSourceRepoSlug(sourceEntry: SourceConfigEntry): string {
-  return `${sourceEntry.Owner}/${sourceEntry.Repo}`;
-}
-
-export function getSourceCloneUrl(sourceEntry: SourceConfigEntry): string {
-  return `https://github.com/${getSourceRepoSlug(sourceEntry)}.git`;
-}
-
 export function getDestinationCloneUrl(config: SyncConfig): string {
-  return config.Destination.Url ?? `https://github.com/${config.Destination.Owner}/${config.Destination.Repo}.git`;
+  return config.Destination.Url ?? `https://github.com/${config.Owner}/${config.Destination.Repo}.git`;
 }
 
-export function getMirrorCloneUrl(config: SyncConfig, mirrorKey: SourceKey): string {
-  return getMirrorCloneUrlByRepoName(config, config.Mirrors[mirrorKey]);
+export function getMirrorCloneUrlForSource(config: SyncConfig, source: SourceConfigEntry): string {
+  return getMirrorCloneUrlByRepoName(config, source.Repo);
 }
 
 export function getMirrorCloneUrlByRepoName(config: SyncConfig, repoName: string): string {
-  return `https://github.com/${config.Mirrors.Owner}/${repoName}.git`;
+  return `https://github.com/${config.Owner}/${repoName}.git`;
 }
 
 export function getMirrorPollRepoNames(config: SyncConfig): string[] {
-  const repos = [config.Mirrors.Ports, config.Mirrors.PortsMingw];
-  if (config.MirrorOnly) {
-    for (const key of Object.keys(config.MirrorOnly)) {
-      const repo = getMirrorRepoNameByKey(config, key);
-      if (repo) {
-        repos.push(repo);
-      }
-    }
-  }
-  return repos;
+  return config.Mirrors.Repos;
 }
 
-export function getMirrorOnlyEntryForRepo(
-  config: SyncConfig,
-  repoName: string
-): MirrorOnlyEntry | null {
-  if (!config.MirrorOnly) {
-    return null;
-  }
-  for (const key of Object.keys(config.MirrorOnly)) {
-    const entry = config.MirrorOnly[key];
-    const repo = getMirrorRepoNameByKey(config, key);
-    if (entry && repo === repoName) {
+export function getSourceConfigEntry(config: SyncConfig, sourceId: string): SourceConfigEntry {
+  const normalized = sourceId.trim().toLowerCase();
+  for (const entry of config.Sources) {
+    if (
+      entry.SortKey === sourceId ||
+      entry.SortKey === normalized ||
+      entry.Repo === sourceId ||
+      entry.Repo.toLowerCase() === normalized ||
+      entry.UpstreamRepo.toLowerCase() === normalized ||
+      `${config.Owner}/${entry.Repo}`.toLowerCase() === normalized
+    ) {
       return entry;
     }
   }
-  return null;
+  throw new Error(`Unknown source: ${sourceId}`);
 }
 
-export function getSourceConfigEntry(config: SyncConfig, sourceKey: SourceKey): SourceConfigEntry {
-  return config.Sources[sourceKey];
+export function getSourceConfigBySortKey(config: SyncConfig, sortKey: string): SourceConfigEntry {
+  return getSourceConfigEntry(config, sortKey);
+}
+
+export function resolveSourcesForCli(config: SyncConfig, sourceOption: string): SourceConfigEntry[] {
+  const normalized = sourceOption.trim().toLowerCase();
+  if (!normalized || normalized === 'all' || normalized === 'both') {
+    return config.Sources;
+  }
+  return [getSourceConfigEntry(config, sourceOption)];
 }

@@ -27,17 +27,22 @@ export function getFirstParent(mirrorPath: string, commit: string): string {
 }
 
 export function formatReplayCommitMessage(input: {
+  Template: string;
   SortKey: string;
   Metadata: Pick<ReplayEntry, 'Subject' | 'Body'>;
   UpstreamRepo: string;
   UpstreamSha: string;
 }): string {
-  const subject = input.Metadata.Subject;
-  const footer = `Source: ${input.UpstreamRepo}@${input.UpstreamSha}`;
-  if (input.Metadata.Body) {
-    return convertToUnixLineEndings(`[${input.SortKey}] ${subject}\n\n${input.Metadata.Body}\n${footer}`);
-  }
-  return convertToUnixLineEndings(`[${input.SortKey}] ${subject}\n${footer}`);
+  const body = convertToUnixLineEndings(input.Metadata.Body);
+  const bodyBlock = body ? `\n\n${body}\n` : '\n';
+  const rendered = input.Template
+    .replaceAll('{SortKey}', input.SortKey)
+    .replaceAll('{Subject}', input.Metadata.Subject)
+    .replaceAll('{Body}', body)
+    .replaceAll('{BodyBlock}', bodyBlock)
+    .replaceAll('{UpstreamRepo}', input.UpstreamRepo)
+    .replaceAll('{UpstreamSha}', input.UpstreamSha);
+  return convertToUnixLineEndings(rendered);
 }
 
 export function parseReplayCommitSourceSha(message: string, upstreamRepo: string): string | null {

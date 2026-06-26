@@ -21,6 +21,15 @@ export function loadMirrorSyncConfigFile(repoRoot: string, repoName: string): Mi
   return JSON.parse(readFileSync(configPath, 'utf8')) as MirrorSyncConfig;
 }
 
+export function getMirrorContentBranch(repoRoot: string, repoName: string): string {
+  const mirrorConfig = loadMirrorSyncConfigFile(repoRoot, repoName);
+  const branch = mirrorConfig?.Branches?.[0]?.Mirror;
+  if (!branch) {
+    throw new Error(`config/mirror-sync/${repoName}.json: missing Branches[0].Mirror`);
+  }
+  return branch;
+}
+
 export function getUpstreamRefSha(upstreamUrl: string, branch: string, logger: SyncLogger): string | null {
   try {
     const out = execSync(`git ls-remote "${upstreamUrl}" "refs/heads/${branch}"`, {
@@ -420,8 +429,9 @@ export async function bootstrapMirrorWorkflowIfToken(input: {
   const token = getMirrorAdminGitHubToken();
   if (!token) {
     input.Logger.write(
-      `No MSYS2_APISS_SYNC_TOKEN or GITHUB_TOKEN; bootstrap ${input.RepoName} manually ` +
-        '(see docs/add-mirror.md)',
+      `No MSYS2_APISS_SYNC_TOKEN or GITHUB_TOKEN in environment; skip workflow ` +
+        `bootstrap for ${input.RepoName} (secret lives on msys2-apiss-sync only; ` +
+        'see docs/add-mirror.md)',
       'Warn'
     );
     return;
@@ -454,11 +464,10 @@ export function createMirrorPollGitHub(token: string, owner: string, logger: Syn
 export async function runMirrorPoll(input: {
   RepoRoot: string;
   Config: SyncConfig;
-  MirrorOwner: string;
   GitHub: MirrorPollGitHub;
   Logger: SyncLogger;
 }): Promise<void> {
-  const mirrorOwner = input.MirrorOwner;
+  const mirrorOwner = input.Config.Owner;
   for (const repo of getMirrorPollRepoNames(input.Config)) {
     const mirrorConfig = loadMirrorSyncConfigFile(input.RepoRoot, repo);
     const needsSync = await mirrorRepoNeedsSync({

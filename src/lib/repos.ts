@@ -1,20 +1,25 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, realpathSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  writeFileSync,
+  copyFileSync,
+  readFileSync,
+  rmSync
+} from 'node:fs';
 import { join } from 'node:path';
 
-import type { SourceKey } from '../types/replay-entry.ts';
 import {
   getDestinationCloneUrl,
-  getMirrorCloneUrl,
   getMirrorCloneUrlByRepoName,
-  getMirrorOnlyEntryForRepo,
-  getSourceConfigEntry,
-  getSourceRepoSlug,
+  getMirrorCloneUrlForSource,
   getSyncRepoRoot,
+  type SourceConfigEntry,
   type SyncConfig
 } from './config.ts';
 import { parseReplayCommitSourceSha, getFirstParent } from './replay.ts';
-import { runGit, runGitText } from './git.ts';
+import { runGit, runGitText, testGitAncestor } from './git.ts';
 import type { SyncLogger } from './log.ts';
 
 export const MIRROR_SYNC_BRANCH = 'sync';
@@ -214,6 +219,28 @@ function remoteHasGitBranch(url: string, branch: string): boolean {
   }
 }
 
+export function mirrorOriginHasContent(originUrl: string, contentBranch: string): boolean {
+  return (
+    remoteHasGitBranch(originUrl, contentBranch) ||
+    remoteHasGitBranch(originUrl, MIRROR_SYNC_BRANCH)
+  );
+}
+
+function isMirrorWorkingCopyIncomplete(mirrorPath: string, contentBranch: string): boolean {
+  if (!existsSync(mirrorPath)) {
+    return false;
+  }
+  if (!existsSync(join(mirrorPath, '.git'))) {
+    return true;
+  }
+  try {
+    assertWorkingCopyMirror(mirrorPath);
+  } catch {
+    return true;
+  }
+  return !refExists(mirrorPath, contentBranch) || !refExists(mirrorPath, MIRROR_SYNC_BRANCH);
+}
+
 function loadMirrorUpstreamUrl(config: SyncConfig, repoName: string, repoRoot: string): string | null {
   const configPath = getMirrorSyncConfigPath(repoRoot, repoName);
   if (existsSync(configPath)) {
@@ -222,7 +249,7 @@ function loadMirrorUpstreamUrl(config: SyncConfig, repoName: string, repoRoot: s
       return parsed.UpstreamUrl;
     }
   }
-  return getMirrorOnlyEntryForRepo(config, repoName)?.UpstreamUrl ?? null;
+  return null;
 }
 
 export function bootstrapMirrorFromUpstreamRoot(input: {
@@ -439,23 +466,56 @@ export function pushMirrorContentBranch(
   if (!refExists(mirrorPath, contentBranch)) {
     return false;
   }
-  const local = runGitText(mirrorPath, ['rev-parse', contentBranch]).trim();
+  try {
+    runGit(mirrorPath, ['fetch', 'origin', '--prune'], {}, 5, logger);
+  } catch {
+    // Empty origin during bootstrap may have nothing to fetch.
+  }
+  const originRef = `origin/${contentBranch}`;
+  const originSha = refExists(mirrorPath, originRef)
+    ? runGitText(mirrorPath, ['rev-parse', originRef]).trim()
+    : null;
+  const pushSha = runGitText(mirrorPath, ['rev-parse', contentBranch]).trim();
   const originUrl = runGitText(mirrorPath, ['remote', 'get-url', 'origin']).trim();
-  const remote = remoteGitBranchSha(originUrl, contentBranch);
-  if (remote === local) {
+  const remoteSha = remoteGitBranchSha(originUrl, contentBranch);
+  if (remoteSha !== null && originSha === remoteSha) {
     logger.write(`${repoName}: ${contentBranch} already on origin`);
     return false;
   }
-  ensureGithubSshPushUrl(mirrorPath, logger);
-  runGit(
-    mirrorPath,
-    ['push', '-u', 'origin', `${contentBranch}:${contentBranch}`],
-    {},
-    5,
-    logger
-  );
-  logger.write(`Pushed ${contentBranch} to origin for ${repoName}`);
-  return true;
+  if (remoteSha === pushSha) {
+    logger.write(`${repoName}: ${contentBranch} already on origin`);
+    return false;
+  }
+  if (remoteSha === null) {
+    ensureGithubSshPushUrl(mirrorPath, logger);
+    runGit(
+      mirrorPath,
+      ['push', '-u', 'origin', `${contentBranch}:${contentBranch}`],
+      {},
+      5,
+      logger
+    );
+    logger.write(`Pushed ${contentBranch} to origin for ${repoName}`);
+    return true;
+  }
+  if (testGitAncestor(mirrorPath, pushSha, remoteSha)) {
+    logger.write(`${repoName}: remote ${contentBranch} ahead of local; skip content push`);
+    return false;
+  }
+  if (testGitAncestor(mirrorPath, remoteSha, pushSha)) {
+    ensureGithubSshPushUrl(mirrorPath, logger);
+    runGit(
+      mirrorPath,
+      ['push', '-u', 'origin', `${contentBranch}:${contentBranch}`],
+      {},
+      5,
+      logger
+    );
+    logger.write(`Pushed ${contentBranch} to origin for ${repoName}`);
+    return true;
+  }
+  logger.write(`${repoName}: ${contentBranch} diverges from origin; skip content push`, 'Warn');
+  return false;
 }
 
 export function pushMirrorSyncBranch(
@@ -495,30 +555,29 @@ function finishMirrorWorkingCopy(input: {
 
 export function initializeMirrorRepository(input: {
   WorkDirectory: string;
-  SourceKey: SourceKey;
+  Source: SourceConfigEntry;
   Config: SyncConfig;
   SkipFetch: boolean;
   Logger: SyncLogger;
 }): string {
-  const sourceEntry = getSourceConfigEntry(input.Config, input.SourceKey);
   const mirrorRoot = join(input.WorkDirectory, 'mirrors');
   mkdirSync(mirrorRoot, { recursive: true });
 
-  const mirrorPath = join(mirrorRoot, sourceEntry.Repo);
-  const url = getMirrorCloneUrl(input.Config, input.SourceKey);
-  const contentBranch = sourceEntry.Branch;
+  const mirrorPath = join(mirrorRoot, input.Source.Repo);
+  const url = getMirrorCloneUrlForSource(input.Config, input.Source);
+  const contentBranch = input.Source.Branch;
 
   if (!existsSync(mirrorPath)) {
     cloneMirrorWorkingCopy({
       Url: url,
       MirrorPath: mirrorPath,
       ContentBranch: contentBranch,
-      Label: input.SourceKey,
+      Label: input.Source.SortKey,
       Logger: input.Logger
     });
     setGitRepoUtf8Encoding(mirrorPath);
   } else if (!input.SkipFetch) {
-    fetchMirrorWorkingCopy(mirrorPath, contentBranch, input.SourceKey, input.Logger);
+    fetchMirrorWorkingCopy(mirrorPath, contentBranch, input.Source.SortKey, input.Logger);
   } else {
     assertWorkingCopyMirror(mirrorPath);
     if (refExists(mirrorPath, MIRROR_SYNC_BRANCH)) {
@@ -530,7 +589,7 @@ export function initializeMirrorRepository(input: {
 
   finishMirrorWorkingCopy({
     MirrorPath: mirrorPath,
-    RepoName: sourceEntry.Repo,
+    RepoName: input.Source.Repo,
     ContentBranch: contentBranch,
     Logger: input.Logger
   });
@@ -554,11 +613,16 @@ export function initializeNamedMirrorRepository(input: {
   const url = getMirrorCloneUrlByRepoName(input.Config, input.RepoName);
   const repoRoot = getSyncRepoRoot();
 
+  if (isMirrorWorkingCopyIncomplete(mirrorPath, input.ContentBranch)) {
+    input.Logger.write(
+      `${input.RepoName}: incomplete local mirror; re-initializing from upstream root`,
+      'Warn'
+    );
+    rmSync(mirrorPath, { recursive: true, force: true });
+  }
+
   if (!existsSync(mirrorPath)) {
-    const hasOriginBranch =
-      remoteHasGitBranch(url, input.ContentBranch) ||
-      remoteHasGitBranch(url, MIRROR_SYNC_BRANCH);
-    if (hasOriginBranch) {
+    if (mirrorOriginHasContent(url, input.ContentBranch)) {
       cloneMirrorWorkingCopy({
         Url: url,
         MirrorPath: mirrorPath,
@@ -573,6 +637,9 @@ export function initializeNamedMirrorRepository(input: {
           `${input.RepoName}: empty origin and no UpstreamUrl; add config/mirror-sync/${input.RepoName}.json`
         );
       }
+      input.Logger.write(
+        `${input.RepoName}: initializing mirror (upstream root only, origin empty on GitHub)`
+      );
       bootstrapMirrorFromUpstreamRoot({
         UpstreamUrl: upstreamUrl,
         OriginUrl: url,
@@ -584,7 +651,13 @@ export function initializeNamedMirrorRepository(input: {
     }
     setGitRepoUtf8Encoding(mirrorPath);
   } else if (!input.SkipFetch) {
-    fetchMirrorWorkingCopy(mirrorPath, input.ContentBranch, input.RepoName, input.Logger);
+    if (mirrorOriginHasContent(url, input.ContentBranch)) {
+      fetchMirrorWorkingCopy(mirrorPath, input.ContentBranch, input.RepoName, input.Logger);
+    } else {
+      input.Logger.write(`${input.RepoName}: origin empty on GitHub; using local working copy`);
+      assertWorkingCopyMirror(mirrorPath);
+      runGit(mirrorPath, ['checkout', MIRROR_SYNC_BRANCH], {}, 5, input.Logger);
+    }
   } else {
     assertWorkingCopyMirror(mirrorPath);
     if (refExists(mirrorPath, MIRROR_SYNC_BRANCH)) {
@@ -720,7 +793,7 @@ export function setDestinationReplayCheckout(
   config: SyncConfig,
   isFullReplay: boolean
 ): void {
-  const replayBranch = config.Destination.Branches.Replay;
+  const replayBranch = config.Destination.ReplayTip;
   if (isFullReplay) {
     checkoutDestinationReplayBranch(destinationPath, replayBranch, config.Destination.BaseCommit);
     return;
@@ -750,12 +823,11 @@ function getLocalDestinationBranchSha(destinationPath: string, branchName: strin
 }
 
 export function testAllSyncBranchesExist(destinationPath: string, config: SyncConfig): boolean {
-  for (const branchName of [
-    config.Destination.Branches.Replay,
-    config.Destination.Branches.CursorPorts,
-    config.Destination.Branches.CursorPortsMingw
-  ]) {
-    if (!getDestinationBranchSha(destinationPath, branchName)) {
+  if (!getDestinationBranchSha(destinationPath, config.Destination.ReplayTip)) {
+    return false;
+  }
+  for (const source of config.Sources) {
+    if (!getDestinationBranchSha(destinationPath, source.CursorBranch)) {
       return false;
     }
   }
@@ -784,16 +856,13 @@ export function setDestinationBranchSha(destinationPath: string, branchName: str
 export function updateDestinationCursorBranchRefs(
   destinationPath: string,
   config: SyncConfig,
-  input: {
-    PortsDestSha: string | null;
-    PortsMingwDestSha: string | null;
-  }
+  updates: Partial<Record<string, string | null>>
 ): void {
-  if (input.PortsDestSha) {
-    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPorts, input.PortsDestSha);
-  }
-  if (input.PortsMingwDestSha) {
-    setDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPortsMingw, input.PortsMingwDestSha);
+  for (const source of config.Sources) {
+    const sha = updates[source.SortKey];
+    if (sha) {
+      setDestinationBranchSha(destinationPath, source.CursorBranch, sha);
+    }
   }
 }
 
@@ -802,15 +871,11 @@ export function updateDestinationSyncBranchRefs(
   config: SyncConfig,
   input: {
     ReplayTipSha: string;
-    PortsDestSha: string | null;
-    PortsMingwDestSha: string | null;
+    CursorDestShas: Record<string, string | null>;
   }
 ): void {
-  setDestinationBranchSha(destinationPath, config.Destination.Branches.Replay, input.ReplayTipSha);
-  updateDestinationCursorBranchRefs(destinationPath, config, {
-    PortsDestSha: input.PortsDestSha,
-    PortsMingwDestSha: input.PortsMingwDestSha
-  });
+  setDestinationBranchSha(destinationPath, config.Destination.ReplayTip, input.ReplayTipSha);
+  updateDestinationCursorBranchRefs(destinationPath, config, input.CursorDestShas);
 }
 
 export function resolveUpstreamCursorSha(
@@ -822,56 +887,47 @@ export function resolveUpstreamCursorSha(
   return parseReplayCommitSourceSha(message, upstreamRepo);
 }
 
-export interface SyncRetrieveCursors {
-  PortsDestSha: string | null;
-  PortsMingwDestSha: string | null;
-  PortsUpstreamSha: string | null;
-  PortsMingwUpstreamSha: string | null;
+export interface SourceCursor {
+  DestSha: string | null;
+  UpstreamSha: string | null;
 }
+
+export type SyncRetrieveCursors = Record<string, SourceCursor>;
 
 export function resolveSyncRetrieveCursorsFromBranches(
   destinationPath: string,
   config: SyncConfig
 ): SyncRetrieveCursors {
-  const portsSource = getSourceConfigEntry(config, 'Ports');
-  const mingwSource = getSourceConfigEntry(config, 'PortsMingw');
-  const portsDestSha = getDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPorts);
-  const mingwDestSha = getDestinationBranchSha(destinationPath, config.Destination.Branches.CursorPortsMingw);
-  return {
-    PortsDestSha: portsDestSha,
-    PortsMingwDestSha: mingwDestSha,
-    PortsUpstreamSha: portsDestSha
-      ? resolveUpstreamCursorSha(destinationPath, portsDestSha, getSourceRepoSlug(portsSource))
-      : null,
-    PortsMingwUpstreamSha: mingwDestSha
-      ? resolveUpstreamCursorSha(destinationPath, mingwDestSha, getSourceRepoSlug(mingwSource))
-      : null
-  };
+  const cursors: SyncRetrieveCursors = {};
+  for (const source of config.Sources) {
+    const destSha = getDestinationBranchSha(destinationPath, source.CursorBranch);
+    cursors[source.SortKey] = {
+      DestSha: destSha,
+      UpstreamSha: destSha
+        ? resolveUpstreamCursorSha(destinationPath, destSha, source.UpstreamRepo)
+        : null
+    };
+  }
+  return cursors;
 }
 
 export function advanceSyncCursorDestShasIfSafe(input: {
   SourceId: string;
   ReplayTipSha: string;
   CursorBranchSafe: boolean;
-  LastPortsDestSha: string | null;
-  LastMingwDestSha: string | null;
-}): { PortsDestSha: string | null; PortsMingwDestSha: string | null } {
-  let portsDestSha = input.LastPortsDestSha;
-  let mingwDestSha = input.LastMingwDestSha;
+  LastDestShas: Record<string, string | null>;
+}): Record<string, string | null> {
+  const result = { ...input.LastDestShas };
   if (!input.CursorBranchSafe) {
-    return { PortsDestSha: portsDestSha, PortsMingwDestSha: mingwDestSha };
+    return result;
   }
-  if (input.SourceId === 'ports') {
-    portsDestSha = input.ReplayTipSha;
-  } else if (input.SourceId === 'ports-mingw') {
-    mingwDestSha = input.ReplayTipSha;
-  }
-  return { PortsDestSha: portsDestSha, PortsMingwDestSha: mingwDestSha };
+  result[input.SourceId] = input.ReplayTipSha;
+  return result;
 }
 
 export function clearDestinationSyncBranches(destinationPath: string, config: SyncConfig, logger: SyncLogger): void {
   const base = config.Destination.BaseCommit;
-  const replayBranch = config.Destination.Branches.Replay;
+  const replayBranch = config.Destination.ReplayTip;
   try {
     runGit(destinationPath, ['cat-file', '-e', `${base}^{commit}`]);
     checkoutDestinationReplayBranch(destinationPath, replayBranch, base);
@@ -884,17 +940,14 @@ export function clearDestinationSyncBranches(destinationPath: string, config: Sy
     }
   }
 
-  for (const branchName of [
-    config.Destination.Branches.CursorPorts,
-    config.Destination.Branches.CursorPortsMingw
-  ]) {
+  for (const source of config.Sources) {
     try {
-      runGit(destinationPath, ['branch', '-D', branchName]);
+      runGit(destinationPath, ['branch', '-D', source.CursorBranch]);
     } catch {
       // Branch may not exist.
     }
     try {
-      runGit(destinationPath, ['update-ref', '-d', `refs/remotes/origin/${branchName}`]);
+      runGit(destinationPath, ['update-ref', '-d', `refs/remotes/origin/${source.CursorBranch}`]);
     } catch {
       // Remote-tracking ref may not exist.
     }
@@ -912,18 +965,15 @@ export function pushDestinationBranches(
   config: SyncConfig,
   forceReplayBranch: boolean
 ): void {
-  const replayBranch = config.Destination.Branches.Replay;
+  const replayBranch = config.Destination.ReplayTip;
   runGit(destinationPath, ['push', 'origin', ...(forceReplayBranch ? ['--force'] : []), replayBranch]);
 
-  for (const branchName of [
-    config.Destination.Branches.CursorPorts,
-    config.Destination.Branches.CursorPortsMingw
-  ]) {
-    const sha = getLocalDestinationBranchSha(destinationPath, branchName);
+  for (const source of config.Sources) {
+    const sha = getLocalDestinationBranchSha(destinationPath, source.CursorBranch);
     if (sha) {
-      runGit(destinationPath, ['push', 'origin', branchName]);
+      runGit(destinationPath, ['push', 'origin', source.CursorBranch]);
     } else {
-      runGit(destinationPath, ['push', 'origin', '--delete', branchName]);
+      runGit(destinationPath, ['push', 'origin', '--delete', source.CursorBranch]);
     }
   }
 }

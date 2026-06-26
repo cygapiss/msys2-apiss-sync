@@ -36,7 +36,7 @@ progress is stored **only** in the destination git clone:
 | `upstream-ports-mingw` | Destination commit at the fork-safe MINGW-packages cursor |
 
 **Resume flow:** re-run sync without `--clean` ([`usage.md`](usage.md)). Sync reads the three branch tips,
-checks out `upstream`, parses upstream mirror cursors from the `Source: msys2/<repo>@<sha>`
+checks out `upstream`, parses mirror cursors from the `Source: msys2/<repo>@<sha>`
 footer on the two cursor-branch commits (`resolveSyncRetrieveCursorsFromBranches`), and
 rebuilds the merged queue from those mirror cursors to each mirror tip.
 
@@ -355,7 +355,7 @@ Each queue item is a `ReplayCommitEntry` produced by `getUpstreamCommitEntries`:
 | Field | Type | Source |
 |-------|------|--------|
 | `Sha` | string | upstream full SHA |
-| `SourceId` | string | `ports` or `ports-mingw` (from `Sources.*.SortKey`) |
+| `SourceId` | string | `SortKey` from the matching `Sources[]` entry |
 | `CommitterDateUnix` | int | upstream committer epoch |
 | `AuthorDateUnix` | int | upstream author epoch |
 | `AuthorName/Email` | string | upstream |
@@ -400,7 +400,7 @@ flowchart TD
 5. **Checkout** -- full replay: `upstream` at BaseCommit; incremental: `upstream` at current replay tip.
 
 6. **Stage 1 -- Retrieve** (`history.ts`)
-   - `getSourceReplayHistory` for Ports and PortsMingw
+   - `getSourceReplayHistory` per source (`SortKey`)
    - Each returns `ReplayCommitEntry[]` in git `--reverse` order
 
 7. **Stage 2 -- Sort** (`queue.ts`)
@@ -449,7 +449,7 @@ Unit tests must cover: rank comparison tie-breakers, merge stability within sour
 
 | Function | Behavior |
 |----------|----------|
-| `formatReplayCommitMessage` | LF-only template: `[<source-id>] <subject>\n\n<body>\nSource: msys2/<repo>@<sha>`; omit blank line before Source when body empty |
+| `formatReplayCommitMessage` | Expand per-source `CommitMessage` template (LF-only); `{UpstreamRepo}` from `Sources[].UpstreamRepo` (e.g. `msys2/MSYS2-packages`); placeholders `{SortKey}`, `{Subject}`, `{Body}`, `{BodyBlock}`, `{UpstreamSha}` |
 | `formatGitReplayDateEnv` | `@<unix>` format for GIT_AUTHOR_DATE / GIT_COMMITTER_DATE |
 | `applyUpstreamCommitToIndex` | Diff upstream commit vs its first parent on mirror (`sha^1`); map paths into one `DestSubdir` only; return `false` if mapped diff empty |
 | `newReplayCommit` | Parent on destination is always current `replayTip` (linear `upstream` only); prefer single `git commit` after index update |
@@ -568,51 +568,45 @@ Edit in git only when values change (rare).
 ```json
 {
   "ReplaySpecVersion": 4,
+  "Owner": "msys2-apiss",
   "Destination": {
-    "Owner": "msys2-apiss",
     "Repo": "msys2-apiss",
     "BaseCommit": "6fc20894663468a04dd4986a8b1c15a9d5ae8649",
-    "Branches": {
-      "Replay": "upstream",
-      "CursorPorts": "upstream-ports",
-      "CursorPortsMingw": "upstream-ports-mingw"
-    }
+    "ReplayTip": "upstream"
   },
-  "Sources": {
-    "Ports": {
-      "Owner": "msys2",
+  "Sources": [
+    {
       "Repo": "MSYS2-packages",
       "Branch": "master",
       "DestSubdir": "ports",
-      "SortKey": "ports"
+      "SortKey": "ports",
+      "CursorBranch": "upstream-ports",
+      "UpstreamRepo": "msys2/MSYS2-packages",
+      "CommitMessage": "[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}"
     },
-    "PortsMingw": {
-      "Owner": "msys2",
+    {
       "Repo": "MINGW-packages",
       "Branch": "master",
       "DestSubdir": "ports-mingw",
-      "SortKey": "ports-mingw"
+      "SortKey": "ports-mingw",
+      "CursorBranch": "upstream-ports-mingw",
+      "UpstreamRepo": "msys2/MINGW-packages",
+      "CommitMessage": "[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}"
     }
-  },
+  ],
   "Mirrors": {
-    "Owner": "msys2-apiss",
-    "Ports": "MSYS2-packages",
-    "PortsMingw": "MINGW-packages",
-    "MingwW64": "mingw-w64",
+    "Repos": [
+      "MSYS2-packages",
+      "MINGW-packages",
+      "mingw-w64"
+    ],
     "SyncIntervalMinutes": 15,
     "DispatchEventType": "upstream-updated"
-  },
-  "MirrorOnly": {
-    "MingwW64": {
-      "UpstreamUrl": "https://git.code.sf.net/p/mingw-w64/mingw-w64",
-      "Branch": "master"
-    }
   },
   "Replay": {
     "MinReplayAgeMinutes": 5,
     "SkipEmptyTreeDiff": true,
-    "LineEnding": "LF",
-    "CommitMessagePrefix": true
+    "LineEnding": "LF"
   },
   "PollIntervalMinutes": 60,
   "DailyReconciliationCron": "0 3 * * *"
@@ -622,10 +616,11 @@ Edit in git only when values change (rare).
 | Key | Purpose |
 |-----|---------|
 | `ReplaySpecVersion` | Algorithm version; bump to 5 if commit-step optimization changes replay SHAs |
+| `Owner` | GitHub org for mirrors and destination (`msys2-apiss`) |
 | `Destination.*` | Target repo, base commit, branch names |
-| `Sources.*` | Upstream repos, paths, sort keys |
-| `Mirrors.*` | Mirror repos (`msys2-apiss/MSYS2-packages`, `msys2-apiss/MINGW-packages`, `msys2-apiss/mingw-w64`), sync interval, dispatch event |
-| `MirrorOnly.*` | Mirror-only repos (not replayed into destination); upstream URL and branch |
+| `Sources[]` | Mirror repo name, paths, sort keys, cursor branches, `UpstreamRepo` (commit footer), `CommitMessage` template |
+| `Mirrors.*` | Polled mirror repo list (`Repos`), sync interval, dispatch event |
+| `config/mirror-sync/*.json` | Per-mirror upstream URL, branches, notify, description, homepage URL |
 
 Mirror repos use branch **`sync`** (default) for workflow YAML only; **`master`** is a
 pure fast-forward copy of upstream `master` with no workflow commits. Templates:
@@ -645,7 +640,7 @@ Read-only at runtime.
 #### `config.ts` functions
 
 - `loadSyncConfig` -- read `config/sync.json`
-- `getSourceCloneUrl`, `getDestinationCloneUrl`, `getMirrorCloneUrl`
+- `getDestinationCloneUrl`, `getMirrorCloneUrlForSource`, `getMirrorCloneUrlByRepoName`
 
 #### `repos.ts` functions (workspace + branches only)
 

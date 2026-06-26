@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 
 import { readFlag, readStringOption } from './args.ts';
-import { getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
+import { getSyncRepoRoot, getSourceConfigEntry, loadSyncConfig } from '../lib/config.ts';
 import {
   convertFromUpstreamCommitLogMetadataText,
   getUpstreamCommitLogMetadataFormat,
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     const outputPath = readStringOption(args, '--output');
     const parentOverride = readStringOption(args, '--parent');
     const branchName = readStringOption(args, '--branch');
-    const baseBranchName = readStringOption(args, '--base-branch') ?? config.Destination.Branches.Replay;
+    const baseBranchName = readStringOption(args, '--base-branch') ?? config.Destination.ReplayTip;
     const modifiesDestination = !printPatch && !listFiles;
 
     if (modifiesDestination && !branchName) {
@@ -101,22 +101,18 @@ async function main(): Promise<void> {
     }
 
     const work = getWorkDirectory(repoRoot);
-    const mirrorPorts = initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'Ports',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
-    const mirrorMingw = initializeMirrorRepository({
-      WorkDirectory: work,
-      SourceKey: 'PortsMingw',
-      Config: config,
-      SkipFetch: skipFetch,
-      Logger: logger
-    });
-    const mirrorPath = source.SourceKey === 'Ports' ? mirrorPorts : mirrorMingw;
-    initializeDestinationAlternates(destinationPath, [mirrorPorts, mirrorMingw]);
+    const sourceEntry = getSourceConfigEntry(config, source.SourceId);
+    const mirrorPaths = config.Sources.map((entry) =>
+      initializeMirrorRepository({
+        WorkDirectory: work,
+        Source: entry,
+        Config: config,
+        SkipFetch: skipFetch,
+        Logger: logger
+      })
+    );
+    const mirrorPath = mirrorPaths[config.Sources.indexOf(sourceEntry)]!;
+    initializeDestinationAlternates(destinationPath, mirrorPaths);
 
     if (modifiesDestination && branchName) {
       checkoutNewDestinationBranchFromBase(destinationPath, branchName, baseBranchName, logger);
@@ -188,8 +184,9 @@ async function main(): Promise<void> {
         if (!logEntry) {
           throw new Error(`Could not read metadata for commit ${commit}`);
         }
-        const replayEntry = newReplayCommitEntry(source.SourceKey, logEntry, config);
+        const replayEntry = newReplayCommitEntry(source.SourceId, logEntry, config);
         const message = formatReplayCommitMessage({
+          Template: sourceEntry.CommitMessage,
           SortKey: source.SortKey,
           Metadata: replayEntry,
           UpstreamRepo: replayEntry.UpstreamRepo,

@@ -39,6 +39,5 @@ jobs:
 
       - name: Run mirror poll
         env:
-          MIRROR_OWNER: msys2-apiss
           MSYS2_APISS_SYNC_TOKEN: ${{ secrets.MSYS2_APISS_SYNC_TOKEN }}
         run: node src/cli/mirror-poll.ts

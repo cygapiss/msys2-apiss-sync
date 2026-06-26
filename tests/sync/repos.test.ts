@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
 
-import { applyMirrorSyncTemplate, bootstrapMirrorFromUpstreamRoot, checkoutDestinationReplayBranch, checkoutNewDestinationBranchFromBase, repairSyncBranchLayout, resolveUpstreamCursorSha, setDestinationBranchSha } from '../../src/lib/repos.ts';
+import { applyMirrorSyncTemplate, bootstrapMirrorFromUpstreamRoot, checkoutDestinationReplayBranch, checkoutNewDestinationBranchFromBase, mirrorOriginHasContent, pushMirrorContentBranch, repairSyncBranchLayout, resolveUpstreamCursorSha, setDestinationBranchSha } from '../../src/lib/repos.ts';
 import type { SyncLogger } from '../../src/lib/log.ts';
+import { DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE } from '../../src/lib/config.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
 
 function runGit(repoPath: string, args: string[]): string {
@@ -172,6 +173,7 @@ describe('resolveUpstreamCursorSha', () => {
         'commit',
         '-m',
         formatReplayCommitMessage({
+          Template: DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE,
           SortKey: 'ports',
           Metadata: { Subject: 'sync foo', Body: '' },
           UpstreamRepo: 'msys2/MSYS2-packages',
@@ -389,6 +391,87 @@ describe('bootstrapMirrorFromUpstreamRoot', () => {
       expect(runGit(mirrorPath, ['rev-parse', 'sync']).trim()).toBe(rootSha);
       expect(runGit(mirrorPath, ['rev-parse', 'refs/remotes/origin/master']).trim()).toBe(rootSha);
       expect(runGit(mirrorPath, ['rev-list', '--count', 'master']).trim()).toBe('1');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('mirrorOriginHasContent', () => {
+  test('returns false for empty bare origin', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-origin-empty-'));
+    try {
+      const bare = join(root, 'origin.git');
+      spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8', windowsHide: true });
+      expect(mirrorOriginHasContent(bare, 'master')).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('returns true when content branch exists on origin', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-origin-branch-'));
+    try {
+      const bare = join(root, 'origin.git');
+      const work = join(root, 'work');
+      spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8', windowsHide: true });
+      initTestRepo(work);
+      writeFileSync(join(work, 'f.txt'), 'x\n', 'utf8');
+      runGit(work, ['add', 'f.txt']);
+      runGit(work, ['commit', '-m', 'init']);
+      runGit(work, ['push', '-u', bare, 'master']);
+      expect(mirrorOriginHasContent(bare, 'master')).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('pushMirrorContentBranch', () => {
+  test('skips push when remote content branch is ahead of local', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-push-content-'));
+    const logs: string[] = [];
+    const logger: SyncLogger = {
+      write(message: string) {
+        logs.push(message);
+      },
+      close() {}
+    };
+    try {
+      const originBare = join(root, 'origin.git');
+      const mirrorPath = join(root, 'mirror');
+      spawnSync('git', ['init', '--bare', originBare], { encoding: 'utf8', windowsHide: true });
+
+      initTestRepo(mirrorPath);
+      writeFileSync(join(mirrorPath, 'old.txt'), 'old\n', 'utf8');
+      runGit(mirrorPath, ['add', 'old.txt']);
+      runGit(mirrorPath, ['commit', '-m', 'old']);
+      const oldSha = runGit(mirrorPath, ['rev-parse', 'HEAD']).trim();
+
+      const originWork = join(root, 'origin-work');
+      initTestRepo(originWork);
+      writeFileSync(join(originWork, 'old.txt'), 'old\n', 'utf8');
+      runGit(originWork, ['add', 'old.txt']);
+      runGit(originWork, ['commit', '-m', 'old']);
+      writeFileSync(join(originWork, 'new.txt'), 'new\n', 'utf8');
+      runGit(originWork, ['add', 'new.txt']);
+      runGit(originWork, ['commit', '-m', 'new']);
+      const newSha = runGit(originWork, ['rev-parse', 'HEAD']).trim();
+      runGit(originWork, ['remote', 'add', 'origin', originBare]);
+      runGit(originWork, ['push', '-u', 'origin', 'master']);
+
+      runGit(mirrorPath, ['remote', 'add', 'origin', originBare]);
+      runGit(mirrorPath, ['fetch', 'origin']);
+      runGit(mirrorPath, ['checkout', '-B', 'master', oldSha]);
+
+      const pushed = pushMirrorContentBranch(mirrorPath, 'master', 'test-mirror', logger);
+      expect(pushed).toBe(false);
+      expect(
+        logs.some(
+          (line) => line.includes('skip content push') || line.includes('already on origin')
+        )
+      ).toBe(true);
+      expect(runGit(originBare, ['rev-parse', 'refs/heads/master']).trim()).toBe(newSha);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

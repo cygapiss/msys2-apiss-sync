@@ -46,31 +46,42 @@ export function getReplaySortRank(input: {
   return `${input.CommitterDateUnix.toString().padStart(12, '0')}|${input.AuthorDateUnix.toString().padStart(12, '0')}|${input.SourceId}|${input.Sha}`;
 }
 
-export function mergeReplayCommitQueues(portsList: ReplayEntry[], portsMingwList: ReplayEntry[]): ReplayEntry[] {
+function mergeTwoReplayCommitQueues(left: ReplayEntry[], right: ReplayEntry[]): ReplayEntry[] {
   const merged: ReplayEntry[] = [];
   let i = 0;
   let j = 0;
 
-  while (i < portsList.length && j < portsMingwList.length) {
-    if (compareReplayRank(portsList[i]!, portsMingwList[j]!) <= 0) {
-      merged.push(portsList[i]!);
+  while (i < left.length && j < right.length) {
+    if (compareReplayRank(left[i]!, right[j]!) <= 0) {
+      merged.push(left[i]!);
       i++;
     } else {
-      merged.push(portsMingwList[j]!);
+      merged.push(right[j]!);
       j++;
     }
   }
 
-  while (i < portsList.length) {
-    merged.push(portsList[i]!);
+  while (i < left.length) {
+    merged.push(left[i]!);
     i++;
   }
 
-  while (j < portsMingwList.length) {
-    merged.push(portsMingwList[j]!);
+  while (j < right.length) {
+    merged.push(right[j]!);
     j++;
   }
 
+  return merged;
+}
+
+export function mergeReplayCommitQueues(...lists: ReplayEntry[][]): ReplayEntry[] {
+  if (lists.length === 0) {
+    return [];
+  }
+  let merged = lists[0]!;
+  for (let index = 1; index < lists.length; index++) {
+    merged = mergeTwoReplayCommitQueues(merged, lists[index]!);
+  }
   return merged;
 }
 
@@ -174,48 +185,40 @@ export function precomputeSourceCursorBranchSafeFlags(
 
 export function precomputeReplayCursorBranchSafeFlags(input: {
   Queue: ReplayEntry[];
-  ParentMapPorts: CommitParentMap;
-  ParentMapMingw: CommitParentMap;
-  PortsEntries?: readonly ReplayEntry[];
-  PortsMingwEntries?: readonly ReplayEntry[];
-  OnSourceProgress?: (sourceId: 'ports' | 'ports-mingw', processed: number, total: number) => void;
+  ParentMaps: Record<string, CommitParentMap>;
+  SourceEntries?: Record<string, readonly ReplayEntry[]>;
+  OnSourceProgress?: (sourceId: string, processed: number, total: number) => void;
   ProgressInterval?: number;
 }): boolean[] {
-  const portsEntries = input.PortsEntries ?? input.Queue.filter((entry) => entry.SourceId === 'ports');
-  const mingwEntries = input.PortsMingwEntries ?? input.Queue.filter((entry) => entry.SourceId === 'ports-mingw');
+  const sourceIds = [...new Set(input.Queue.map((entry) => entry.SourceId))];
   const progressInterval = input.ProgressInterval ?? 2000;
-  const portsSafe = precomputeSourceCursorBranchSafeFlags(
-    portsEntries,
-    input.ParentMapPorts,
-    undefined,
-    input.OnSourceProgress ? (processed, total) => input.OnSourceProgress!('ports', processed, total) : undefined,
-    progressInterval
-  );
-  const mingwSafe = precomputeSourceCursorBranchSafeFlags(
-    mingwEntries,
-    input.ParentMapMingw,
-    undefined,
-    input.OnSourceProgress ? (processed, total) => input.OnSourceProgress!('ports-mingw', processed, total) : undefined,
-    progressInterval
-  );
+  const safeBySource: Record<string, boolean[]> = {};
+  for (const sourceId of sourceIds) {
+    const entries =
+      input.SourceEntries?.[sourceId] ?? input.Queue.filter((entry) => entry.SourceId === sourceId);
+    safeBySource[sourceId] = precomputeSourceCursorBranchSafeFlags(
+      entries,
+      input.ParentMaps[sourceId]!,
+      undefined,
+      input.OnSourceProgress
+        ? (processed, total) => input.OnSourceProgress!(sourceId, processed, total)
+        : undefined,
+      progressInterval
+    );
+  }
+  const indices: Record<string, number> = {};
+  const cursorSafe: Record<string, boolean> = {};
+  for (const sourceId of sourceIds) {
+    indices[sourceId] = 0;
+    cursorSafe[sourceId] = true;
+  }
   const flags = new Array<boolean>(input.Queue.length);
-  let portsIndex = 0;
-  let mingwIndex = 0;
-  let portsCursorSafe = true;
-  let mingwCursorSafe = true;
-
   for (let index = 0; index < input.Queue.length; index++) {
     const entry = input.Queue[index]!;
-    if (entry.SourceId === 'ports') {
-      portsCursorSafe = portsSafe[portsIndex] ?? true;
-      portsIndex++;
-    } else {
-      mingwCursorSafe = mingwSafe[mingwIndex] ?? true;
-      mingwIndex++;
-    }
-    flags[index] = portsCursorSafe && mingwCursorSafe;
+    cursorSafe[entry.SourceId] = safeBySource[entry.SourceId]![indices[entry.SourceId]!] ?? true;
+    indices[entry.SourceId]!++;
+    flags[index] = sourceIds.every((sourceId) => cursorSafe[sourceId]);
   }
-
   return flags;
 }
 

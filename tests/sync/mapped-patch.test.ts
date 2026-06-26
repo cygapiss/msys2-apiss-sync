@@ -80,8 +80,8 @@ describe('resolveMirrorSourceFromCli', () => {
     const config = loadSyncConfig();
     expect(resolveMirrorSourceFromCli('ports', config).DestSubdir).toBe('ports');
     expect(resolveMirrorSourceFromCli('ports-mingw', config).DestSubdir).toBe('ports-mingw');
-    expect(resolveMirrorSourceFromCli('MSYS2-packages', config).SourceKey).toBe('Ports');
-    expect(resolveMirrorSourceFromCli('MINGW-packages', config).SourceKey).toBe('PortsMingw');
+    expect(resolveMirrorSourceFromCli('MSYS2-packages', config).SourceId).toBe('ports');
+    expect(resolveMirrorSourceFromCli('MINGW-packages', config).SourceId).toBe('ports-mingw');
   });
 });
 

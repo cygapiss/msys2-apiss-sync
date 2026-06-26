@@ -2,7 +2,7 @@ import { join } from 'node:path';
 
 import { performance } from 'node:perf_hooks';
 
-import { getSyncRepoRoot, loadSyncConfig } from '../lib/config.ts';
+import { getSyncRepoRoot, getSourceConfigBySortKey, loadSyncConfig } from '../lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
 import { getWorkDirectory, setSyncUtf8Environment, type SyncLogger } from '../lib/log.ts';
 import {
@@ -69,37 +69,39 @@ async function main(): Promise<void> {
   console.log(`[prepare] Prepare benchmark start (graphOnly=${graphOnly})`);
 
   let stepStart = performance.now();
+  const portsSource = getSourceConfigBySortKey(config, 'ports');
+  const mingwSource = getSourceConfigBySortKey(config, 'ports-mingw');
   const mirrorPorts = initializeMirrorRepository({
     WorkDirectory: work,
-    SourceKey: 'Ports',
+    Source: portsSource,
     Config: config,
     SkipFetch: skipFetch,
     Logger: silentLogger
   });
   const mirrorMingw = initializeMirrorRepository({
     WorkDirectory: work,
-    SourceKey: 'PortsMingw',
+    Source: mingwSource,
     Config: config,
     SkipFetch: skipFetch,
     Logger: silentLogger
   });
   logTiming('init mirrors', elapsedMs(stepStart));
 
-  const tipPorts = getMirrorTipSha(mirrorPorts, config.Sources.Ports.Branch);
-  const tipMingw = getMirrorTipSha(mirrorMingw, config.Sources.PortsMingw.Branch);
+  const tipPorts = getMirrorTipSha(mirrorPorts, portsSource.Branch);
+  const tipMingw = getMirrorTipSha(mirrorMingw, mingwSource.Branch);
   console.log(`[prepare] tips ports=${tipPorts.slice(0, 8)} mingw=${tipMingw.slice(0, 8)}`);
 
   const graphCacheDir = join(work, 'cache', 'replay-graph');
   const portsCachePath = getMirrorParentGraphCachePath(
     graphCacheDir,
-    'Ports',
-    config.Sources.Ports.Branch,
+    portsSource.SortKey,
+    portsSource.Branch,
     tipPorts
   );
   const mingwCachePath = getMirrorParentGraphCachePath(
     graphCacheDir,
-    'PortsMingw',
-    config.Sources.PortsMingw.Branch,
+    mingwSource.SortKey,
+    mingwSource.Branch,
     tipMingw
   );
 
@@ -107,9 +109,9 @@ async function main(): Promise<void> {
   const portsParentStart = performance.now();
   const portsParentPromise = loadOrBuildMirrorCommitParentMap({
     CachePath: portsCachePath,
-    Branch: config.Sources.Ports.Branch,
+    Branch: portsSource.Branch,
     TipSha: tipPorts,
-    Build: () => buildMirrorCommitParentMap(mirrorPorts, config.Sources.Ports.Branch)
+    Build: () => buildMirrorCommitParentMap(mirrorPorts, portsSource.Branch)
   }).then((map) => {
     logTiming('parent map ports', elapsedMs(portsParentStart), `commits=${map.size}`);
     return map;
@@ -117,9 +119,9 @@ async function main(): Promise<void> {
   const mingwParentStart = performance.now();
   const mingwParentPromise = loadOrBuildMirrorCommitParentMap({
     CachePath: mingwCachePath,
-    Branch: config.Sources.PortsMingw.Branch,
+    Branch: mingwSource.Branch,
     TipSha: tipMingw,
-    Build: () => buildMirrorCommitParentMap(mirrorMingw, config.Sources.PortsMingw.Branch)
+    Build: () => buildMirrorCommitParentMap(mirrorMingw, mingwSource.Branch)
   }).then((map) => {
     logTiming('parent map mingw', elapsedMs(mingwParentStart), `commits=${map.size}`);
     return map;
@@ -149,10 +151,10 @@ async function main(): Promise<void> {
 
   stepStart = performance.now();
   const retrieveCursors = resolveSyncRetrieveCursorsFromBranches(destPath, config);
-  const cursorPorts = retrieveCursors.PortsUpstreamSha;
-  const cursorMingw = retrieveCursors.PortsMingwUpstreamSha;
+  const cursorPorts = retrieveCursors.ports?.UpstreamSha ?? null;
+  const cursorMingw = retrieveCursors['ports-mingw']?.UpstreamSha ?? null;
   const isFullReplay = !testAllSyncBranchesExist(destPath, config);
-  const replayTipSha = getDestinationBranchSha(destPath, config.Destination.Branches.Replay);
+  const replayTipSha = getDestinationBranchSha(destPath, config.Destination.ReplayTip);
   logTiming('read cursors', elapsedMs(stepStart), `fullReplay=${isFullReplay} replayTip=${replayTipSha ? replayTipSha.slice(0, 8) : 'none'}`);
 
   if (cursorPorts && cursorMingw) {
@@ -161,14 +163,14 @@ async function main(): Promise<void> {
 
   stepStart = performance.now();
   const portsHistoryStart = performance.now();
-  const portsHistoryPromise = getSourceReplayHistory('Ports', config, mirrorPorts, cursorPorts, tipPorts).then(
+  const portsHistoryPromise = getSourceReplayHistory('ports', config, mirrorPorts, cursorPorts, tipPorts).then(
     (entries) => {
       logTiming('retrieve history ports', elapsedMs(portsHistoryStart), `count=${entries.length}`);
       return entries;
     }
   );
   const mingwHistoryStart = performance.now();
-  const mingwHistoryPromise = getSourceReplayHistory('PortsMingw', config, mirrorMingw, cursorMingw, tipMingw).then(
+  const mingwHistoryPromise = getSourceReplayHistory('ports-mingw', config, mirrorMingw, cursorMingw, tipMingw).then(
     (entries) => {
       logTiming('retrieve history mingw', elapsedMs(mingwHistoryStart), `count=${entries.length}`);
       return entries;
@@ -200,15 +202,15 @@ async function main(): Promise<void> {
   const [parentMapPorts, parentMapMingw] = await Promise.all([
     loadOrBuildMirrorCommitParentMap({
       CachePath: portsCachePath,
-      Branch: config.Sources.Ports.Branch,
+      Branch: portsSource.Branch,
       TipSha: tipPorts,
-      Build: () => buildMirrorCommitParentMap(mirrorPorts, config.Sources.Ports.Branch)
+      Build: () => buildMirrorCommitParentMap(mirrorPorts, portsSource.Branch)
     }),
     loadOrBuildMirrorCommitParentMap({
       CachePath: mingwCachePath,
-      Branch: config.Sources.PortsMingw.Branch,
+      Branch: mingwSource.Branch,
       TipSha: tipMingw,
-      Build: () => buildMirrorCommitParentMap(mirrorMingw, config.Sources.PortsMingw.Branch)
+      Build: () => buildMirrorCommitParentMap(mirrorMingw, mingwSource.Branch)
     })
   ]);
   logTiming('parent maps reload (wall)', elapsedMs(parentReloadStart));

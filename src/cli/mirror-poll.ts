@@ -13,15 +13,12 @@ async function main(): Promise<void> {
     throw new Error('MSYS2_APISS_SYNC_TOKEN or GITHUB_TOKEN is required');
   }
 
-  const mirrorOwner = process.env.MIRROR_OWNER ?? config.Mirrors.Owner;
-
   try {
     logger.write('Mirror poll start');
-    const github = createMirrorPollGitHub(token, mirrorOwner, logger);
+    const github = createMirrorPollGitHub(token, config.Owner, logger);
     await runMirrorPoll({
       RepoRoot: repoRoot,
       Config: config,
-      MirrorOwner: mirrorOwner,
       GitHub: github,
       Logger: logger
     });

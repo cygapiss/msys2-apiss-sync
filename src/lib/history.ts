@@ -1,5 +1,5 @@
-import type { ParsedCommitObject, ReplayEntry, SourceKey, UpstreamLogEntry } from '../types/replay-entry.ts';
-import { getSourceConfigEntry, getSourceRepoSlug, type SyncConfig } from './config.ts';
+import type { ParsedCommitObject, ReplayEntry, UpstreamLogEntry } from '../types/replay-entry.ts';
+import { getSourceConfigEntry, type SourceConfigEntry, type SyncConfig } from './config.ts';
 import { convertToUnixLineEndings, splitCommitMessage } from './log.ts';
 import { runGitText, streamGitText } from './git.ts';
 
@@ -76,14 +76,18 @@ export function resolveMirrorContentBranchRef(mirrorPath: string, branch: string
   }
 }
 
-export function newReplayCommitEntry(sourceId: SourceKey, logEntry: UpstreamLogEntry, config: SyncConfig): ReplayEntry {
+export function newReplayCommitEntry(
+  sourceId: string,
+  logEntry: UpstreamLogEntry,
+  config: SyncConfig
+): ReplayEntry {
   const sourceEntry = getSourceConfigEntry(config, sourceId);
   return {
     Sha: logEntry.Sha,
     SourceId: sourceEntry.SortKey,
     SortKey: sourceEntry.SortKey,
     DestSubdir: sourceEntry.DestSubdir,
-    UpstreamRepo: getSourceRepoSlug(sourceEntry),
+    UpstreamRepo: sourceEntry.UpstreamRepo,
     CommitterDateUnix: logEntry.CommitterDateUnix,
     AuthorDateUnix: logEntry.AuthorDateUnix,
     AuthorName: logEntry.AuthorName,
@@ -96,15 +100,15 @@ export function newReplayCommitEntry(sourceId: SourceKey, logEntry: UpstreamLogE
 }
 
 export async function getSourceReplayHistory(
-  sourceKey: SourceKey,
+  sourceId: string,
   config: SyncConfig,
   mirrorPath: string,
   afterSha: string | null,
   untilSha: string
 ): Promise<ReplayEntry[]> {
-  const sourceEntry = getSourceConfigEntry(config, sourceKey);
+  const sourceEntry = getSourceConfigEntry(config, sourceId);
   const text = await exportUpstreamCommitLogRawText(mirrorPath, afterSha, untilSha, sourceEntry.Branch);
-  return convertFromUpstreamCommitLogMetadataText(text).map((entry) => newReplayCommitEntry(sourceKey, entry, config));
+  return convertFromUpstreamCommitLogMetadataText(text).map((entry) => newReplayCommitEntry(sourceId, entry, config));
 }
 
 export function parseGitCommitObject(rawInput: string): ParsedCommitObject {

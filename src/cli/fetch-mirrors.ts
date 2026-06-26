@@ -1,14 +1,61 @@
-import { getMirrorOnlyEntryForRepo, getSourceConfigEntry, getSyncRepoRoot, getMirrorPollRepoNames, loadSyncConfig } from '../lib/config.ts';
-import { getMirrorTipSha } from '../lib/history.ts';
-import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
-import { bootstrapMirrorWorkflowIfToken } from '../lib/mirror-poll.ts';
 import {
-  initializeMirrorRepository,
+  getMirrorCloneUrlByRepoName,
+  getMirrorPollRepoNames,
+  getSyncRepoRoot,
+  loadSyncConfig
+} from '../lib/config.ts';
+import { getMirrorTipSha } from '../lib/history.ts';
+import { ensureGhMirrorRepo } from '../lib/gh-cli.ts';
+import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
+import {
+  bootstrapMirrorWorkflowIfToken,
+  getMirrorContentBranch,
+  loadMirrorSyncConfigFile
+} from '../lib/mirror-poll.ts';
+import {
   initializeNamedMirrorRepository,
+  mirrorOriginHasContent,
   pushMirrorContentBranch,
   pushMirrorSyncBranch
 } from '../lib/repos.ts';
-import { readFlag } from './args.ts';
+import { readFlag, readStringOption } from './args.ts';
+
+async function pushSyncMirror(input: {
+  MirrorPath: string;
+  RepoName: string;
+  ContentBranch: string;
+  Config: ReturnType<typeof loadSyncConfig>;
+  Logger: ReturnType<typeof createSyncLogger>;
+}): Promise<void> {
+  const originUrl = getMirrorCloneUrlByRepoName(input.Config, input.RepoName);
+  const isNewMirror = !mirrorOriginHasContent(originUrl, input.ContentBranch);
+  if (isNewMirror) {
+    input.Logger.write(
+      `${input.RepoName}: new mirror init (push content root + sync, then trigger mirror-sync)`
+    );
+    const mirrorConfig = loadMirrorSyncConfigFile(getSyncRepoRoot(), input.RepoName);
+    ensureGhMirrorRepo({
+      Owner: input.Config.Owner,
+      RepoName: input.RepoName,
+      Description: mirrorConfig?.Description,
+      Url: mirrorConfig?.Url,
+      Logger: input.Logger
+    });
+  }
+  pushMirrorContentBranch(input.MirrorPath, input.ContentBranch, input.RepoName, input.Logger);
+  pushMirrorSyncBranch(input.MirrorPath, input.RepoName, input.Logger);
+  if (!isNewMirror) {
+    return;
+  }
+  await bootstrapMirrorWorkflowIfToken({
+    Owner: input.Config.Owner,
+    RepoName: input.RepoName,
+    ContentBranch: input.ContentBranch,
+    Logger: input.Logger,
+    TriggerSync: true,
+    WaitForSync: true
+  });
+}
 
 async function main(): Promise<void> {
   setSyncUtf8Environment();
@@ -21,44 +68,18 @@ async function main(): Promise<void> {
     const work = getWorkDirectory(repoRoot);
     const skipFetch = readFlag(args, '--skip-fetch');
     const pushSync = readFlag(args, '--push-sync');
+    const repoFilter = readStringOption(args, '--repo');
     logger.write('Fetching mirrors');
 
-    for (const sourceKey of ['Ports', 'PortsMingw'] as const) {
-      const mirrorPath = initializeMirrorRepository({
-        WorkDirectory: work,
-        SourceKey: sourceKey,
-        Config: config,
-        SkipFetch: skipFetch,
-        Logger: logger
-      });
-      const branch = config.Sources[sourceKey].Branch;
-      const repoName = getSourceConfigEntry(config, sourceKey).Repo;
-      if (pushSync) {
-        pushMirrorContentBranch(mirrorPath, branch, repoName, logger);
-        pushMirrorSyncBranch(mirrorPath, repoName, logger);
-        await bootstrapMirrorWorkflowIfToken({
-          Owner: config.Mirrors.Owner,
-          RepoName: repoName,
-          ContentBranch: branch,
-          Logger: logger,
-          TriggerSync: true,
-          WaitForSync: true
-        });
-      }
-      const tip = getMirrorTipSha(mirrorPath, branch);
-      const syncTip = getMirrorTipSha(mirrorPath, 'sync');
-      logger.write(
-        `${sourceKey} mirror: ${mirrorPath} (sync = ${syncTip.slice(0, 8)}, ${branch} = ${tip.slice(0, 8)})`
-      );
+    if (repoFilter && !getMirrorPollRepoNames(config).includes(repoFilter)) {
+      throw new Error(`Unknown mirror repo: ${repoFilter}`);
     }
 
-    const replayRepoNames = new Set([config.Mirrors.Ports, config.Mirrors.PortsMingw]);
     for (const repoName of getMirrorPollRepoNames(config)) {
-      if (replayRepoNames.has(repoName)) {
+      if (repoFilter && repoFilter !== repoName) {
         continue;
       }
-      const entry = getMirrorOnlyEntryForRepo(config, repoName);
-      const branch = entry?.Branch ?? 'master';
+      const branch = getMirrorContentBranch(repoRoot, repoName);
       const mirrorPath = initializeNamedMirrorRepository({
         WorkDirectory: work,
         RepoName: repoName,
@@ -68,15 +89,12 @@ async function main(): Promise<void> {
         Logger: logger
       });
       if (pushSync) {
-        pushMirrorContentBranch(mirrorPath, branch, repoName, logger);
-        pushMirrorSyncBranch(mirrorPath, repoName, logger);
-        await bootstrapMirrorWorkflowIfToken({
-          Owner: config.Mirrors.Owner,
+        await pushSyncMirror({
+          MirrorPath: mirrorPath,
           RepoName: repoName,
           ContentBranch: branch,
-          Logger: logger,
-          TriggerSync: true,
-          WaitForSync: true
+          Config: config,
+          Logger: logger
         });
       }
       const syncTip = getMirrorTipSha(mirrorPath, 'sync');
