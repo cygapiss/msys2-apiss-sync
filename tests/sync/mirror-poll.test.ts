@@ -1,82 +1,80 @@
 import { describe, expect, test } from 'vitest';
 
-import { mirrorRepoNeedsSync, mirrorSyncReadyState, type MirrorPollGitHub } from '../../src/lib/mirror-poll.ts';
+import { mirrorRepoNeedsSync, parseGitHubRepoFromUrl } from '../../src/mirror-poll/index.ts';
 import type { MirrorSyncConfig } from '../../src/types/mirror-sync-config.ts';
-import type { Logger } from '../../src/lib/log.ts';
-
-const noopLogger: Logger = {
-  write() {},
-  close() {}
-};
 
 function mirrorConfig(overrides: Partial<MirrorSyncConfig> = {}): MirrorSyncConfig {
   return {
-    UpstreamUrl: 'https://example.com/upstream.git',
+    UpstreamUrl: 'https://github.com/msys2/MSYS2-packages.git',
     Branches: [{ Upstream: 'master', Mirror: 'master' }],
     ...overrides
   };
 }
 
-function fakeGitHub(branchSha: string | null): MirrorPollGitHub {
-  return {
-    async getBranchSha() {
-      return branchSha;
-    },
-    async dispatchMirrorSync(_repo, _contentBranch) {}
-  };
-}
-
-describe('mirrorSyncReadyState', () => {
-  test('normal when workflow registered', () => {
-    expect(mirrorSyncReadyState({ WorkflowRegistered: true })).toBe('normal');
+describe('parseGitHubRepoFromUrl', () => {
+  test('parses https and git@ GitHub URLs', () => {
+    expect(parseGitHubRepoFromUrl('https://github.com/msys2/MSYS2-packages.git')).toEqual({
+      Owner: 'msys2',
+      Repo: 'MSYS2-packages'
+    });
+    expect(parseGitHubRepoFromUrl('git@github.com:msys2/MINGW-packages.git')).toEqual({
+      Owner: 'msys2',
+      Repo: 'MINGW-packages'
+    });
   });
 
-  test('bootstrap when workflow not registered', () => {
-    expect(mirrorSyncReadyState({ WorkflowRegistered: false })).toBe('bootstrap');
+  test('returns null for non-GitHub upstream', () => {
+    expect(parseGitHubRepoFromUrl('https://gcc.gnu.org/git/gcc.git')).toBeNull();
   });
 });
 
 describe('mirrorRepoNeedsSync', () => {
   test('returns false when mirror and upstream SHAs match', async () => {
-    const needsSync = await mirrorRepoNeedsSync({
+    await expect(mirrorRepoNeedsSync({
       RepoName: 'mirror',
+      MirrorOwner: 'msys2-apiss',
       MirrorConfig: mirrorConfig(),
-      GitHub: fakeGitHub('abc123'),
-      Logger: noopLogger,
-      GetUpstreamSha: () => 'abc123'
-    });
-    expect(needsSync).toBe(false);
+      GetUpstreamSha: () => 'abc123',
+      GetMirrorSha: () => 'abc123'
+    })).resolves.toBe(false);
   });
 
   test('returns true when mirror SHA differs from upstream', async () => {
-    const needsSync = await mirrorRepoNeedsSync({
+    await expect(mirrorRepoNeedsSync({
       RepoName: 'mirror',
+      MirrorOwner: 'msys2-apiss',
       MirrorConfig: mirrorConfig(),
-      GitHub: fakeGitHub('abc123'),
-      Logger: noopLogger,
-      GetUpstreamSha: () => 'def456'
-    });
-    expect(needsSync).toBe(true);
+      GetUpstreamSha: () => 'def456',
+      GetMirrorSha: () => 'abc123'
+    })).resolves.toBe(true);
   });
 
-  test('returns true when mirror branch is missing', async () => {
-    const needsSync = await mirrorRepoNeedsSync({
+  test('returns true when mirror branch is missing on GitHub', async () => {
+    await expect(mirrorRepoNeedsSync({
       RepoName: 'mirror',
+      MirrorOwner: 'msys2-apiss',
       MirrorConfig: mirrorConfig(),
-      GitHub: fakeGitHub(null),
-      Logger: noopLogger,
-      GetUpstreamSha: () => 'def456'
-    });
-    expect(needsSync).toBe(true);
+      GetUpstreamSha: () => 'def456',
+      GetMirrorSha: () => null
+    })).resolves.toBe(true);
   });
 
   test('returns true when mirror-sync config is missing', async () => {
-    const needsSync = await mirrorRepoNeedsSync({
+    await expect(mirrorRepoNeedsSync({
       RepoName: 'mirror',
-      MirrorConfig: null,
-      GitHub: fakeGitHub(null),
-      Logger: noopLogger
-    });
-    expect(needsSync).toBe(true);
+      MirrorOwner: 'msys2-apiss',
+      MirrorConfig: null
+    })).resolves.toBe(true);
+  });
+
+  test('returns true when upstream is not on GitHub', async () => {
+    await expect(mirrorRepoNeedsSync({
+      RepoName: 'gcc',
+      MirrorOwner: 'msys2-apiss',
+      MirrorConfig: mirrorConfig({
+        UpstreamUrl: 'https://gcc.gnu.org/git/gcc.git'
+      }),
+      GetMirrorSha: () => 'abc123'
+    })).resolves.toBe(true);
   });
 });

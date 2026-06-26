@@ -9,7 +9,8 @@ import {
 import { getMirrorTipSha } from '../lib/history.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
 import { runGitText } from '../lib/git.ts';
-import { getMirrorContentBranch, startMirrorSyncAfterPush } from '../lib/mirror-poll.ts';
+import { getMirrorContentBranch } from '../mirror-poll/index.ts';
+import { startMirrorSyncAfterPush } from '../lib/mirror-sync-dispatch.ts';
 import {
   initializeNamedMirrorRepository,
   MIRROR_SYNC_BRANCH,

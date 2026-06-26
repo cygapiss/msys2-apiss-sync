@@ -9,9 +9,9 @@ import { ensureGhMirrorRepo } from '../lib/gh-cli.ts';
 import { createSyncLogger, getWorkDirectory, setSyncUtf8Environment } from '../lib/log.ts';
 import {
   getMirrorContentBranch,
-  loadMirrorSyncConfigFile,
-  startMirrorSyncAfterPush
-} from '../lib/mirror-poll.ts';
+  loadMirrorSyncConfigFile
+} from '../mirror-poll/index.ts';
+import { startMirrorSyncAfterPush } from '../lib/mirror-sync-dispatch.ts';
 import {
   initializeNamedMirrorRepository,
   mirrorOriginHasContent,

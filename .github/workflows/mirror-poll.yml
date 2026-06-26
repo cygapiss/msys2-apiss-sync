@@ -1,9 +1,7 @@
 name: Mirror poll
 
-# Trigger mirror-sync on mirrors when content branch HEAD differs from upstream.
-# Logic: node src/cli/mirror-poll.ts (no yarn install; zero runtime deps).
-# unreliable on GitHub-hosted runners; central dispatch is dependable.
-# Mirrors.SyncIntervalMinutes=15 in config/sync.json (cron below).
+# Block 2: loop config, compare GitHub tips, workflow_dispatch mirror-sync.
+# Entry: node src/mirror-poll/cli.ts (GitHub Actions only; no yarn script).
 
 on:
   push:
@@ -39,5 +37,5 @@ jobs:
 
       - name: Run mirror poll
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: node src/cli/mirror-poll.ts
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node src/mirror-poll/cli.ts

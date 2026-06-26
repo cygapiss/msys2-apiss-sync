@@ -22,7 +22,7 @@ import { parseReplayCommitSourceSha, getFirstParent } from './replay.ts';
 import { runGit, runGitText, testGitAncestor } from './git.ts';
 import type { Logger } from './log.ts';
 
-export const MIRROR_SYNC_BRANCH = 'msys2-apiss-sync';
+export const MIRROR_SYNC_BRANCH = 'msys2-apiss-mirror-sync';
 
 export const MIRROR_SYNC_COMMIT_MESSAGE =
   'Mirror sync workflow from msys2-apiss-sync\n\n' +

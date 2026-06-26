@@ -1,4 +1,5 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { runGit, runGitText } from '../git/index.ts';
 import type { Logger } from '../git/log.ts';
@@ -181,4 +182,54 @@ export function writeGitHubOutput(path: string, result: MirrorSyncResult): void 
     lines.push(`notify_event_type=${result.Notify.EventType ?? ''}`);
   }
   appendFileSync(path, `${lines.join('\n')}\n`, 'utf8');
+}
+
+function readStringOption(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index < 0) {
+    return undefined;
+  }
+  const value = args[index + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error(`Missing value for ${name}`);
+  }
+  return value;
+}
+
+function createMirrorSyncLogger(): Logger {
+  return {
+    write(message, level = 'Info') {
+      const prefix =
+        level === 'Warn' ? '[mirror-sync][warn]' : level === 'Error' ? '[mirror-sync][error]' : '[mirror-sync]';
+      console.log(`${prefix} ${message}`);
+    },
+    close() {}
+  };
+}
+
+export function runMirrorSyncCli(): void {
+  process.env.LANG = 'C.UTF-8';
+  process.env.LC_ALL = 'C.UTF-8';
+
+  const args = process.argv.slice(2);
+  const repoPath = resolve(readStringOption(args, '--repo-path') ?? process.cwd());
+  const configPath = resolve(readStringOption(args, '--config') ?? `${repoPath}/.github/mirror-sync.json`);
+  const logger = createMirrorSyncLogger();
+
+  try {
+    const result = runMirrorSync({
+      RepoPath: repoPath,
+      Config: loadMirrorSyncConfig(configPath),
+      Logger: logger
+    });
+    if (process.env.GITHUB_OUTPUT) {
+      writeGitHubOutput(process.env.GITHUB_OUTPUT, result);
+    }
+    logger.write(`done. advanced=${result.Advanced} dispatch_mirror_merge=${result.DispatchMirrorMerge}`);
+  } catch (error) {
+    logger.write(error instanceof Error ? error.message : String(error), 'Error');
+    process.exitCode = 1;
+  } finally {
+    logger.close();
+  }
 }
