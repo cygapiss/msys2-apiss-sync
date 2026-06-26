@@ -13,7 +13,7 @@ Full copy-paste steps: [`docs/usage.md`](../docs/usage.md).
 | File | Purpose |
 |------|---------|
 | `mirror-poll.yml` | Push/cron/manual: runs `yarn mirror-poll` (dispatch when HEAD != upstream) |
-| `sync-upstream.yml` | Push to `main`, `repository_dispatch`, hourly/daily cron, manual (`clean=true`) |
+| `config/mirror-template/mirror-merge.yml` (installed as `.github/workflows/mirror-merge.yml` on branch `msys2-apiss-mirror-merge`) | `repository_dispatch`, hourly/daily cron, manual (`clean=true`) |
 
 Dry-run manifest verification: run locally (`yarn sync --dry-run --skip-fetch`); see
 [`docs/run-local.md`](../docs/run-local.md).
@@ -45,12 +45,12 @@ by `yarn fetch-mirrors`).
 
 ```yaml
 concurrency:
-  group: sync-upstream
+  group: mirror-merge
   cancel-in-progress: false
 ```
 
 Long sync runs must not be cancelled by the next hourly cron. Scheduled runs
-skip when another `sync-upstream` job is already in progress; push, dispatch, and
+skip when another `mirror-merge` job is already in progress; dispatch and
 manual runs queue until the current run finishes.
 
 ## Secrets (mirror repos only)

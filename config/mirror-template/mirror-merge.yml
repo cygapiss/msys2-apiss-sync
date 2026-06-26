@@ -1,4 +1,11 @@
-name: Sync upstream
+name: Mirror merge
+
+# Install on tooling repo branch msys2-apiss-mirror-merge (workflows live here, not on main).
+# Copy this file to: msys2-apiss-mirror-merge/.github/workflows/mirror-merge.yml
+#   (from config/mirror-template/mirror-merge.yml in msys2-apiss-sync; applied by yarn mirror-init)
+#
+# main holds TypeScript and config; checkout main below for yarn sync.
+# Block 3 package mirrors dispatch workflow_dispatch_mirror_merge to this workflow.
 
 on:
   push:
@@ -19,7 +26,7 @@ on:
         type: boolean
 
 concurrency:
-  group: sync-upstream
+  group: mirror-merge
   cancel-in-progress: false
 
 permissions:
@@ -45,14 +52,14 @@ jobs:
             const { data } = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'sync-upstream.yml',
+              workflow_id: 'mirror-merge.yml',
               status: 'in_progress',
               per_page: 100,
               headers,
             });
             const busy = data.workflow_runs.some((run) => run.id !== context.runId);
             if (busy) {
-              core.info('Another sync-upstream run is in progress; skipping scheduled run.');
+              core.info('Another mirror-merge run is in progress; skipping scheduled run.');
               core.setOutput('proceed', 'false');
               return;
             }
@@ -100,7 +107,7 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Run sync
+      - name: Run mirror merge
         run: |
           args=(--destination-path .work/destination/msys2-apiss)
           if [ "${{ inputs.clean }}" = "true" ]; then

@@ -2,7 +2,9 @@ import { join } from 'node:path';
 
 import { performance } from 'node:perf_hooks';
 
-import { getSourceConfigEntry, type SyncConfig, type Logger } from './config.ts';
+import { readFlag, readIntOption, readStringOption } from './args.ts';
+import { getSourceConfigEntry, getSyncRepoRoot, loadSyncConfig, type SyncConfig, type Logger } from './config.ts';
+import { createMirrorMergeLogger, getWorkDirectory, setMirrorMergeUtf8Environment } from './log.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from './history.ts';
 import {
   buildMirrorCommitParentMap,
@@ -335,4 +337,37 @@ export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorM
   logger.write('Mirror-Merge done.');
 
   return { Status: 'done', Processed: queue.length, Replayed: replayed, TipSha: replayTip };
+}
+
+export async function runMirrorMergeCli(): Promise<void> {
+  setMirrorMergeUtf8Environment();
+  const args = process.argv.slice(2);
+  const repoRoot = getSyncRepoRoot();
+  const config = loadSyncConfig(repoRoot);
+  const logger = createMirrorMergeLogger(repoRoot, {
+    logFile: readStringOption(args, '--log-file'),
+    append: readFlag(args, '--log-append'),
+    logToConsole: readFlag(args, '--log-to-console')
+  });
+
+  try {
+    await runMirrorMerge({
+      RepoRoot: repoRoot,
+      WorkDirectory: getWorkDirectory(repoRoot),
+      Config: config,
+      Logger: logger,
+      Clean: readFlag(args, '--clean'),
+      DryRun: readFlag(args, '--dry-run'),
+      SkipFetch: readFlag(args, '--skip-fetch'),
+      MaxCommits: readIntOption(args, '--max-commits', 0),
+      DestinationPath: readStringOption(args, '--destination-path')
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.write(message, 'Error');
+    logger.write('Re-run without --clean to continue from branch cursors.', 'Warn');
+    process.exitCode = 1;
+  } finally {
+    logger.close();
+  }
 }

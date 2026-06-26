@@ -11,7 +11,8 @@ Local testing and debugging: [`run-local.md`](run-local.md). Design and flags:
 ## GitHub (`gh`)
 
 Pushing to `main` on this repo runs [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml)
-and [`sync-upstream.yml`](../.github/workflows/sync-upstream.yml) automatically.
+automatically. Block 4 CI is [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml)
+on branch `msys2-apiss-mirror-merge` (installed by `yarn mirror-init`).
 
 Requires the [GitHub CLI](https://cli.github.com/) (`gh auth login`) with access to
 `msys2-apiss`. Local commands use **git** and **gh** only; no env secrets.
@@ -113,14 +114,14 @@ Usually automatic after step 2. Trigger manually when mirrors are already curren
 or dispatch did not run:
 
 ```bash
-gh workflow run sync-upstream.yml --repo msys2-apiss/msys2-apiss-sync
+gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss-sync --ref msys2-apiss-mirror-merge
 gh run watch --repo msys2-apiss/msys2-apiss-sync
 ```
 
 ### 4. Verify CI run
 
 ```bash
-gh run list --repo msys2-apiss/msys2-apiss-sync --workflow sync-upstream.yml --limit 5
+gh run list --repo msys2-apiss/msys2-apiss-sync --workflow mirror-merge.yml --ref msys2-apiss-mirror-merge --limit 5
 ```
 
 Check destination branch tips on `msys2-apiss/msys2-apiss` (`upstream`,
@@ -134,7 +135,7 @@ run locally: [`run-local.md`](run-local.md#verify-replay-manifest).
 | Goal | Command |
 |------|---------|
 | Resume after failure | Repeat step 3 (incremental from branch cursors) |
-| Reset branches, full replay | `gh workflow run sync-upstream.yml --repo msys2-apiss/msys2-apiss-sync -f clean=true` |
+| Reset branches, full replay | `gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss-sync --ref msys2-apiss-mirror-merge -f clean=true` |
 
 ## Local machine
 
