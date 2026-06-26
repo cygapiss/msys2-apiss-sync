@@ -1,4 +1,4 @@
-import type { ReplayEntry } from '../types/replay-entry.ts';
+import type { ReplayEntry } from '../mirror-merge/replay-entry.ts';
 import { runGit, runGitStdin, runGitText } from './git.ts';
 import { convertToUnixLineEndings } from './log.ts';
 

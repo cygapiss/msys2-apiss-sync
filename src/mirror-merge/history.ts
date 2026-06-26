@@ -1,4 +1,4 @@
-import type { ReplayEntry, UpstreamLogEntry } from '../types/replay-entry.ts';
+import type { ReplayEntry, UpstreamLogEntry } from './replay-entry.ts';
 import type { SyncConfig } from './config.ts';
 import { getSourceConfigEntry } from './config.ts';
 import { convertToUnixLineEndings, splitCommitMessage } from './log.ts';

@@ -11,7 +11,7 @@ import {
   getReplaySortRank,
   mergeReplayCommitQueues
 } from '../../src/lib/queue.ts';
-import type { ReplayEntry } from '../../src/types/replay-entry.ts';
+import type { ReplayEntry } from '../../src/mirror-merge/replay-entry.ts';
 
 function newTestQueueItem(input: {
   SourceId: string;

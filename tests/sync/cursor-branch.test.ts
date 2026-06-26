@@ -20,7 +20,7 @@ import {
 } from '../../src/lib/queue.ts';
 import { DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE } from '../../src/lib/config.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
-import type { ReplayEntry } from '../../src/types/replay-entry.ts';
+import type { ReplayEntry } from '../../src/mirror-merge/replay-entry.ts';
 
 const config = loadSyncConfig(getSyncRepoRoot());
 

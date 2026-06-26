@@ -1,4 +1,4 @@
-import type { ParsedCommitObject, ReplayEntry, UpstreamLogEntry } from '../types/replay-entry.ts';
+import type { ParsedCommitObject, ReplayEntry, UpstreamLogEntry } from '../mirror-merge/replay-entry.ts';
 import { getSourceConfigEntry, type SourceConfigEntry, type SyncConfig } from './config.ts';
 import { convertToUnixLineEndings, splitCommitMessage } from './log.ts';
 import { runGitText, streamGitText } from './git.ts';

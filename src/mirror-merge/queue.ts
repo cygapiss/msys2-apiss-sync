@@ -1,4 +1,4 @@
-import type { ReplayEntry } from '../types/replay-entry.ts';
+import type { ReplayEntry } from './replay-entry.ts';
 import type { SyncConfig } from './config.ts';
 import {
   precomputeForkSafeFlagsForQueue

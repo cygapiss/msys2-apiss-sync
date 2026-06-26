@@ -14,7 +14,7 @@ self-contained pipeline stages.
 Cross-module imports are limited to:
 
 - `../git/*` -- git subprocess helpers and `Logger`
-- `../types/*` -- shared types (e.g. `mirror-sync-config`, `replay-entry`)
+- `../types/*` -- shared types (e.g. `mirror-sync-config`)
 
 Also allowed:
 

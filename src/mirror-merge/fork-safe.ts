@@ -1,4 +1,4 @@
-import type { ReplayEntry } from '../types/replay-entry.ts';
+import type { ReplayEntry } from './replay-entry.ts';
 
 export type CommitParentMap = Map<string, readonly string[]>;
 
