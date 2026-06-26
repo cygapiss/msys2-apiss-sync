@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
-import type { SyncLogger } from './log.ts';
+import type { Logger } from './log.ts';
 import { MIRROR_SYNC_BRANCH } from './repos.ts';
 
 function runGh(args: string[]): { ok: boolean; stdout: string; stderr: string } {
@@ -68,7 +68,7 @@ export function setGhRepoDefaultBranch(
   owner: string,
   repoName: string,
   branch: string,
-  logger: SyncLogger
+  logger: Logger
 ): boolean {
   if (!ghCommandAvailable()) {
     return false;
@@ -139,7 +139,7 @@ export function ghMirrorSyncRunInProgress(owner: string, repoName: string): bool
 export function ghDispatchMirrorSyncWorkflow(
   owner: string,
   repoName: string,
-  logger?: SyncLogger
+  logger?: Logger
 ): { ok: boolean; skipped?: boolean; notFound?: boolean } {
   if (!ghCommandAvailable()) {
     return { ok: false };
@@ -171,7 +171,7 @@ export function ensureGhMirrorRepo(input: {
   RepoName: string;
   Description?: string;
   Url?: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): void {
   if (ghRepoExists(input.Owner, input.RepoName)) {
     input.Logger.write(`${input.Owner}/${input.RepoName} already exists on GitHub`);

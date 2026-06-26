@@ -20,7 +20,7 @@ import {
 } from './config.ts';
 import { parseReplayCommitSourceSha, getFirstParent } from './replay.ts';
 import { runGit, runGitText, testGitAncestor } from './git.ts';
-import type { SyncLogger } from './log.ts';
+import type { Logger } from './log.ts';
 
 export const MIRROR_SYNC_BRANCH = 'msys2-apiss-sync';
 
@@ -85,7 +85,7 @@ function isSyncBranchLayoutValid(mirrorPath: string, contentBranch: string): boo
 export function repairSyncBranchLayout(
   mirrorPath: string,
   contentBranch: string,
-  logger: SyncLogger,
+  logger: Logger,
   options?: { CommitMessage?: string; Force?: boolean; SkipCheckout?: boolean }
 ): boolean {
   assertWorkingCopyMirror(mirrorPath);
@@ -145,7 +145,7 @@ export function repairSyncBranchLayout(
 function validateSyncBranchLayout(
   mirrorPath: string,
   contentBranch: string,
-  logger: SyncLogger
+  logger: Logger
 ): void {
   const originContent = `origin/${contentBranch}`;
   if (!refExists(mirrorPath, originContent)) {
@@ -178,7 +178,7 @@ function validateSyncBranchLayout(
 function fetchOriginBranchOptional(
   mirrorPath: string,
   branch: string,
-  logger: SyncLogger
+  logger: Logger
 ): void {
   try {
     runGit(
@@ -196,7 +196,7 @@ function fetchOriginBranchOptional(
 function fetchOriginMirrorSyncRefs(
   mirrorPath: string,
   contentBranch: string,
-  logger: SyncLogger
+  logger: Logger
 ): void {
   fetchOriginBranchOptional(mirrorPath, MIRROR_SYNC_BRANCH, logger);
   fetchOriginBranchOptional(mirrorPath, contentBranch, logger);
@@ -205,7 +205,7 @@ function fetchOriginMirrorSyncRefs(
 function bootstrapLocalMirrorSyncBranch(
   mirrorPath: string,
   contentBranch: string,
-  logger: SyncLogger
+  logger: Logger
 ): void {
   const originContent = `origin/${contentBranch}`;
   if (!refExists(mirrorPath, originContent)) {
@@ -224,7 +224,7 @@ function bootstrapLocalMirrorSyncBranch(
 function checkoutMirrorSyncBranch(
   mirrorPath: string,
   contentBranch: string,
-  logger: SyncLogger,
+  logger: Logger,
   autoRepair = true
 ): void {
   fetchOriginMirrorSyncRefs(mirrorPath, contentBranch, logger);
@@ -318,7 +318,7 @@ export function bootstrapMirrorFromUpstreamRoot(input: {
   MirrorPath: string;
   ContentBranch: string;
   RepoName: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): void {
   input.Logger.write(
     `Bootstrapping ${input.RepoName}: fetch upstream ${input.ContentBranch} commit graph ` +
@@ -360,7 +360,7 @@ function cloneMirrorWorkingCopy(input: {
   MirrorPath: string;
   ContentBranch: string;
   Label: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): void {
   input.Logger.write(`Cloning mirror working copy ${input.Label} (${input.Url})`);
   runGit(null, ['clone', input.Url, input.MirrorPath], {}, 5, input.Logger);
@@ -371,7 +371,7 @@ function fetchMirrorWorkingCopy(
   mirrorPath: string,
   contentBranch: string,
   label: string,
-  logger: SyncLogger
+  logger: Logger
 ): void {
   assertWorkingCopyMirror(mirrorPath);
   logger.write(`Fetching mirror working copy ${label}`);
@@ -420,7 +420,7 @@ export function applyMirrorSyncTemplate(input: {
   MirrorPath: string;
   RepoName: string;
   ContentBranch: string;
-  Logger: SyncLogger;
+  Logger: Logger;
   RepoRoot?: string;
 }): boolean {
   const repoRoot = input.RepoRoot ?? getSyncRepoRoot();
@@ -493,7 +493,7 @@ export function githubSshPushUrl(httpsOriginUrl: string): string | null {
   return `git@github.com:${match[1]}/${repo}`;
 }
 
-function ensureGithubSshPushUrl(mirrorPath: string, logger: SyncLogger): void {
+function ensureGithubSshPushUrl(mirrorPath: string, logger: Logger): void {
   let originUrl: string;
   try {
     originUrl = runGitText(mirrorPath, ['remote', 'get-url', 'origin']).trim();
@@ -527,7 +527,7 @@ function mirrorPushViaSsh(mirrorPath: string): boolean {
   }
 }
 
-function maybeEnsureGithubSshPushUrl(mirrorPath: string, logger: SyncLogger): void {
+function maybeEnsureGithubSshPushUrl(mirrorPath: string, logger: Logger): void {
   if (mirrorPushViaSsh(mirrorPath)) {
     ensureGithubSshPushUrl(mirrorPath, logger);
   }
@@ -537,7 +537,7 @@ export function pushMirrorContentBranch(
   mirrorPath: string,
   contentBranch: string,
   repoName: string,
-  logger: SyncLogger
+  logger: Logger
 ): boolean {
   if (!refExists(mirrorPath, contentBranch)) {
     return false;
@@ -597,7 +597,7 @@ export function pushMirrorContentBranch(
 export function pushMirrorSyncBranch(
   mirrorPath: string,
   repoName: string,
-  logger: SyncLogger
+  logger: Logger
 ): boolean {
   if (!refExists(mirrorPath, MIRROR_SYNC_BRANCH)) {
     return false;
@@ -621,7 +621,7 @@ function finishMirrorWorkingCopy(input: {
   MirrorPath: string;
   RepoName: string;
   ContentBranch: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): void {
   if (!refExists(input.MirrorPath, MIRROR_SYNC_BRANCH)) {
     return;
@@ -634,7 +634,7 @@ export function initializeMirrorRepository(input: {
   Source: SourceConfigEntry;
   Config: SyncConfig;
   SkipFetch: boolean;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): string {
   const mirrorRoot = join(input.WorkDirectory, 'mirrors');
   mkdirSync(mirrorRoot, { recursive: true });
@@ -680,7 +680,7 @@ export function initializeNamedMirrorRepository(input: {
   ContentBranch: string;
   Config: SyncConfig;
   SkipFetch: boolean;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): string {
   const mirrorRoot = join(input.WorkDirectory, 'mirrors');
   mkdirSync(mirrorRoot, { recursive: true });
@@ -759,7 +759,7 @@ export function initializeDestinationRepository(input: {
   Config: SyncConfig;
   DestinationPath?: string;
   SkipFetch: boolean;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): string {
   if (input.DestinationPath) {
     const destPath = realpathSync(input.DestinationPath);
@@ -807,7 +807,7 @@ export function initializeDestinationAlternates(destinationPath: string, mirrorP
   writeFileSync(join(alternatesDir, 'alternates'), `${normalized.join('\n')}\n`, 'utf8');
 }
 
-export function ensureDestinationBaseCommit(destinationPath: string, config: SyncConfig, logger: SyncLogger): void {
+export function ensureDestinationBaseCommit(destinationPath: string, config: SyncConfig, logger: Logger): void {
   const base = config.Destination.BaseCommit;
   try {
     runGit(destinationPath, ['cat-file', '-e', `${base}^{commit}`]);
@@ -842,7 +842,7 @@ export function checkoutNewDestinationBranchFromBase(
   destinationPath: string,
   branchName: string,
   baseBranchName: string,
-  logger: SyncLogger
+  logger: Logger
 ): string {
   const protectedNames = new Set([baseBranchName]);
   if (protectedNames.has(branchName)) {
@@ -1001,7 +1001,7 @@ export function advanceSyncCursorDestShasIfSafe(input: {
   return result;
 }
 
-export function clearDestinationSyncBranches(destinationPath: string, config: SyncConfig, logger: SyncLogger): void {
+export function clearDestinationSyncBranches(destinationPath: string, config: SyncConfig, logger: Logger): void {
   const base = config.Destination.BaseCommit;
   const replayBranch = config.Destination.ReplayTip;
   try {

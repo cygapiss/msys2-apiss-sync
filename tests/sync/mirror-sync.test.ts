@@ -8,12 +8,12 @@ import {
   getMirrorSyncNotify,
   mirrorBranchNeedsUpdate,
   runMirrorSync,
-  validateMirrorSyncConfig
+  validateMirrorSyncConfig,
+  type Logger
 } from '../../src/mirror-sync/index.ts';
-import type { SyncLogger } from '../../src/lib/log.ts';
 import type { MirrorSyncConfig } from '../../src/types/mirror-sync-config.ts';
 
-const noopLogger: SyncLogger = {
+const noopLogger: Logger = {
   write() {},
   close() {}
 };

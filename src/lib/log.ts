@@ -1,10 +1,8 @@
 import { mkdirSync, openSync, writeFileSync, writeSync, closeSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 
-export interface SyncLogger {
-  write(message: string, level?: 'Info' | 'Warn' | 'Error'): void;
-  close(): void;
-}
+export type { Logger } from '../git/log.ts';
+import type { Logger } from '../git/log.ts';
 
 export function convertToUnixLineEndings(text: string | null | undefined): string {
   return (text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -46,7 +44,7 @@ export function createSyncLogger(repoRoot: string, options: {
   logFile?: string;
   append?: boolean;
   logToConsole?: boolean;
-} = {}): SyncLogger {
+} = {}): Logger {
   const quietConsole = Boolean(options.logFile) && !options.logToConsole;
   let fd: number | undefined;
 

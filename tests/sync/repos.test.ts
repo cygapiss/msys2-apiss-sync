@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
 
 import { applyMirrorSyncTemplate, bootstrapMirrorFromUpstreamRoot, checkoutDestinationReplayBranch, checkoutNewDestinationBranchFromBase, mirrorOriginHasContent, MIRROR_SYNC_BRANCH, pushMirrorContentBranch, repairSyncBranchLayout, resolveUpstreamCursorSha, setDestinationBranchSha } from '../../src/lib/repos.ts';
-import type { SyncLogger } from '../../src/lib/log.ts';
+import type { Logger } from '../../src/lib/log.ts';
 import { DEFAULT_REPLAY_COMMIT_MESSAGE_TEMPLATE } from '../../src/lib/config.ts';
 import { formatReplayCommitMessage } from '../../src/lib/replay.ts';
 
@@ -79,7 +79,7 @@ describe('setDestinationBranchSha', () => {
 });
 
 describe('checkoutNewDestinationBranchFromBase', () => {
-  const logger: SyncLogger = {
+  const logger: Logger = {
     write() {},
     close() {}
   };
@@ -204,7 +204,7 @@ describe('resolveUpstreamCursorSha', () => {
 });
 
 describe('repairSyncBranchLayout', () => {
-  const noopLogger: SyncLogger = {
+  const noopLogger: Logger = {
     write() {},
     close() {}
   };
@@ -257,7 +257,7 @@ describe('repairSyncBranchLayout', () => {
 });
 
 describe('applyMirrorSyncTemplate', () => {
-  const noopLogger: SyncLogger = {
+  const noopLogger: Logger = {
     write() {},
     close() {}
   };
@@ -359,7 +359,7 @@ describe('applyMirrorSyncTemplate', () => {
 });
 
 describe('bootstrapMirrorFromUpstreamRoot', () => {
-  const noopLogger: SyncLogger = {
+  const noopLogger: Logger = {
     write() {},
     close() {}
   };
@@ -435,7 +435,7 @@ describe('pushMirrorContentBranch', () => {
   test('skips push when remote content branch is ahead of local', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-push-content-'));
     const logs: string[] = [];
-    const logger: SyncLogger = {
+    const logger: Logger = {
       write(message: string) {
         logs.push(message);
       },

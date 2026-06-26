@@ -4,7 +4,7 @@ import { performance } from 'node:perf_hooks';
 
 import { getSyncRepoRoot, getSourceConfigBySortKey, loadSyncConfig } from '../lib/config.ts';
 import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
-import { getWorkDirectory, setSyncUtf8Environment, type SyncLogger } from '../lib/log.ts';
+import { getWorkDirectory, setSyncUtf8Environment, type Logger } from '../lib/log.ts';
 import {
   buildMirrorCommitParentMap,
   filterReplayQueueByAge,
@@ -26,7 +26,7 @@ import {
 } from '../lib/repos.ts';
 import { readFlag, readStringOption } from './args.ts';
 
-const silentLogger: SyncLogger = {
+const silentLogger: Logger = {
   write() {},
   close() {}
 };

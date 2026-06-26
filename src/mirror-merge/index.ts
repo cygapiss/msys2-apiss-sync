@@ -2,9 +2,8 @@ import { join } from 'node:path';
 
 import { performance } from 'node:perf_hooks';
 
-import { getSourceConfigEntry, type SyncConfig } from '../lib/config.ts';
-import { getMirrorTipSha, getSourceReplayHistory } from '../lib/history.ts';
-import type { SyncLogger } from '../lib/log.ts';
+import { getSourceConfigEntry, type SyncConfig, type Logger } from './config.ts';
+import { getMirrorTipSha, getSourceReplayHistory } from './history.ts';
 import {
   buildMirrorCommitParentMap,
   filterReplayQueueByAge,
@@ -12,7 +11,7 @@ import {
   mergeReplayCommitQueues,
   precomputeReplayCursorBranchSafeFlags,
   type CommitParentMap
-} from '../lib/queue.ts';
+} from './queue.ts';
 import {
   advanceSyncCursorDestShasIfSafe,
   clearDestinationSyncBranches,
@@ -28,24 +27,26 @@ import {
   testAllSyncBranchesExist,
   updateDestinationCursorBranchRefs,
   updateDestinationSyncBranchRefs
-} from '../lib/repos.ts';
+} from './repos.ts';
 import {
   getMirrorParentGraphCachePath,
   loadOrBuildMirrorCommitParentMap
-} from '../lib/replay-graph.ts';
+} from './replay-graph.ts';
 import {
   applyUpstreamCommitToIndex,
   formatReplayCommitMessage,
   newReplayCommit,
   testUpstreamCommitHasMappedChanges
-} from '../lib/replay.ts';
-import { runGit, runGitText } from '../lib/git.ts';
+} from './replay.ts';
+import { runGit, runGitText } from '../git/index.ts';
+
+export type { SyncConfig, Logger, SourceConfigEntry } from './config.ts';
 
 export interface MirrorMergeOptions {
   RepoRoot: string;
   WorkDirectory: string;
   Config: SyncConfig;
-  Logger: SyncLogger;
+  Logger: Logger;
   Clean?: boolean;
   DryRun?: boolean;
   SkipFetch?: boolean;
@@ -235,7 +236,6 @@ export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorM
   logger.write('Precomputed fork-safe cursor branch flags');
 
   let replayed = 0;
-  const lastUpstreamShas: Record<string, string | null> = { ...upstreamCursors };
   const skipEmpty = Boolean(config.Replay.SkipEmptyTreeDiff);
 
   for (let index = 0; index < queue.length; index++) {
@@ -281,8 +281,6 @@ export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorM
         entryReplayed = true;
       }
     }
-
-    lastUpstreamShas[entry.SourceId] = entry.Sha;
 
     if (!dryRun && entryReplayed) {
       const cursorBranchSafe = cursorBranchSafeFlags[index] ?? false;

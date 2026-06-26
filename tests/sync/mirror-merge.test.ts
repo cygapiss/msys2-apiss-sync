@@ -4,7 +4,7 @@ import {
   formatMirrorMergeCursorSummary,
   resolveMirrorMergeMode
 } from '../../src/mirror-merge/index.ts';
-import type { SyncConfig } from '../../src/lib/config.ts';
+import type { SyncConfig } from '../../src/mirror-merge/config.ts';
 
 const testConfig: SyncConfig = {
   ReplaySpecVersion: 4,

@@ -2,9 +2,9 @@ import { describe, expect, test } from 'vitest';
 
 import { mirrorRepoNeedsSync, mirrorSyncReadyState, type MirrorPollGitHub } from '../../src/lib/mirror-poll.ts';
 import type { MirrorSyncConfig } from '../../src/types/mirror-sync-config.ts';
-import type { SyncLogger } from '../../src/lib/log.ts';
+import type { Logger } from '../../src/lib/log.ts';
 
-const noopLogger: SyncLogger = {
+const noopLogger: Logger = {
   write() {},
   close() {}
 };

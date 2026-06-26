@@ -1,8 +1,10 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 
-import { runGit, runGitText } from '../lib/git.ts';
-import type { SyncLogger } from '../lib/log.ts';
+import { runGit, runGitText } from '../git/index.ts';
+import type { Logger } from '../git/log.ts';
 import type { MirrorSyncBranchPair, MirrorSyncConfig } from '../types/mirror-sync-config.ts';
+
+export type { Logger } from '../git/log.ts';
 
 export interface MirrorSyncBranchResult {
   Upstream: string;
@@ -27,8 +29,7 @@ export interface MirrorSyncResult {
 export interface MirrorSyncOptions {
   RepoPath: string;
   Config: MirrorSyncConfig;
-  Logger: SyncLogger;
-  PushTags?: boolean;
+  Logger: Logger;
 }
 
 export function loadMirrorSyncConfig(path: string): MirrorSyncConfig {
@@ -75,23 +76,18 @@ function getRefSha(repoPath: string, ref: string): string | null {
   }
 }
 
-function pushMirrorRef(repoPath: string, refspec: string, logger: SyncLogger): void {
-  runGit(repoPath, ['push', 'origin', refspec], {}, 5, logger);
-}
-
-function pushMirrorTags(repoPath: string, logger: SyncLogger): void {
+function ensureUpstreamRemote(repoPath: string, upstreamUrl: string): void {
   try {
-    runGit(repoPath, ['push', 'origin', '--tags'], {}, 5, logger);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.write(`Tag push failed: ${message}`, 'Warn');
+    runGit(repoPath, ['remote', 'add', 'upstream', upstreamUrl], {}, 1);
+  } catch {
+    runGit(repoPath, ['remote', 'set-url', 'upstream', upstreamUrl], {}, 1);
   }
 }
 
-export function syncMirrorBranch(input: {
+function syncMirrorBranch(input: {
   RepoPath: string;
   Branch: MirrorSyncBranchPair;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): MirrorSyncBranchResult {
   const { RepoPath, Branch, Logger } = input;
   Logger.write(`Syncing ${Branch.Upstream} -> ${Branch.Mirror}`);
@@ -105,8 +101,7 @@ export function syncMirrorBranch(input: {
 
   const beforeSha = getRefSha(RepoPath, `origin/${Branch.Mirror}`);
   const afterSha = runGitText(RepoPath, ['rev-parse', `upstream/${Branch.Upstream}`]).trim();
-  const advanced = mirrorBranchNeedsUpdate(beforeSha, afterSha);
-  if (!advanced) {
+  if (!mirrorBranchNeedsUpdate(beforeSha, afterSha)) {
     Logger.write(`No upstream changes for ${Branch.Mirror}.`);
     return {
       Upstream: Branch.Upstream,
@@ -118,7 +113,7 @@ export function syncMirrorBranch(input: {
   }
 
   Logger.write(`Advanced ${Branch.Mirror} from ${beforeSha ?? '<none>'} to ${afterSha}`);
-  pushMirrorRef(RepoPath, `upstream/${Branch.Upstream}:refs/heads/${Branch.Mirror}`, Logger);
+  runGit(RepoPath, ['push', 'origin', `upstream/${Branch.Upstream}:refs/heads/${Branch.Mirror}`], {}, 5, Logger);
   return {
     Upstream: Branch.Upstream,
     Mirror: Branch.Mirror,
@@ -130,12 +125,7 @@ export function syncMirrorBranch(input: {
 
 export function runMirrorSync(input: MirrorSyncOptions): MirrorSyncResult {
   validateMirrorSyncConfig(input.Config);
-
-  try {
-    runGit(input.RepoPath, ['remote', 'add', 'upstream', input.Config.UpstreamUrl], {}, 1);
-  } catch {
-    runGit(input.RepoPath, ['remote', 'set-url', 'upstream', input.Config.UpstreamUrl], {}, 1);
-  }
+  ensureUpstreamRemote(input.RepoPath, input.Config.UpstreamUrl);
 
   const branches = input.Config.Branches.map((branch) =>
     syncMirrorBranch({
@@ -149,8 +139,11 @@ export function runMirrorSync(input: MirrorSyncOptions): MirrorSyncResult {
   if (input.Config.SyncTags ?? true) {
     input.Logger.write('Syncing tags from upstream');
     runGit(input.RepoPath, ['fetch', 'upstream', '--tags'], {}, 5, input.Logger);
-    if (input.PushTags ?? true) {
-      pushMirrorTags(input.RepoPath, input.Logger);
+    try {
+      runGit(input.RepoPath, ['push', 'origin', '--tags'], {}, 5, input.Logger);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      input.Logger.write(`Tag push failed: ${message}`, 'Warn');
     }
   }
 

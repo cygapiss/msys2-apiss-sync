@@ -13,7 +13,7 @@ import {
   requireGhCommand,
   setGhRepoDefaultBranch
 } from './gh-cli.ts';
-import type { SyncLogger } from './log.ts';
+import type { Logger } from './log.ts';
 import { getMirrorSyncConfigPath, MIRROR_SYNC_BRANCH } from './repos.ts';
 
 export interface MirrorPollGitHub {
@@ -38,7 +38,7 @@ export function getMirrorContentBranch(repoRoot: string, repoName: string): stri
   return branch;
 }
 
-export function getUpstreamRefSha(upstreamUrl: string, branch: string, logger: SyncLogger): string | null {
+export function getUpstreamRefSha(upstreamUrl: string, branch: string, logger: Logger): string | null {
   try {
     const out = execSync(`git ls-remote "${upstreamUrl}" "refs/heads/${branch}"`, {
       encoding: 'utf8',
@@ -59,7 +59,7 @@ export async function mirrorRepoNeedsSync(input: {
   RepoName: string;
   MirrorConfig: MirrorSyncConfig | null;
   GitHub: MirrorPollGitHub;
-  Logger: SyncLogger;
+  Logger: Logger;
   GetUpstreamSha?: (upstreamUrl: string, branch: string) => string | null;
 }): Promise<boolean> {
   const getUpstreamSha = input.GetUpstreamSha ?? ((url, branch) => getUpstreamRefSha(url, branch, input.Logger));
@@ -109,7 +109,7 @@ function mirrorSyncRunInProgress(owner: string, repo: string): boolean {
 async function dispatchMirrorSyncWorkflow(input: {
   Owner: string;
   RepoName: string;
-  Logger?: SyncLogger;
+  Logger?: Logger;
 }): Promise<boolean> {
   requireGhCommand();
   const repoSlug = `${input.Owner}/${input.RepoName}`;
@@ -134,7 +134,7 @@ async function dispatchWithRetry(
   owner: string,
   repo: string,
   contentBranch: string,
-  logger: SyncLogger,
+  logger: Logger,
   maxAttempts = 4
 ): Promise<void> {
   let bootstrapped = false;
@@ -181,7 +181,7 @@ export function mirrorSyncWorkflowRegistered(owner: string, repoName: string): b
 async function waitForMirrorSyncWorkflowRegistered(input: {
   Owner: string;
   RepoName: string;
-  Logger: SyncLogger;
+  Logger: Logger;
   maxAttempts?: number;
 }): Promise<boolean> {
   const maxAttempts = input.maxAttempts ?? 5;
@@ -219,7 +219,7 @@ async function ensureMirrorSyncWorkflowRegistered(input: {
   Owner: string;
   RepoName: string;
   ContentBranch: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): Promise<void> {
   if (mirrorSyncWorkflowRegistered(input.Owner, input.RepoName)) {
     return;
@@ -244,7 +244,7 @@ async function restoreMirrorContentDefaultBranch(input: {
   Owner: string;
   RepoName: string;
   ContentBranch: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): Promise<void> {
   if (input.ContentBranch === MIRROR_SYNC_BRANCH || !ghCommandAvailable()) {
     return;
@@ -265,7 +265,7 @@ async function runMirrorSyncDispatch(input: {
   Owner: string;
   RepoName: string;
   ContentBranch: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): Promise<void> {
   if (await mirrorRepoReadyForNormalSync(input.Owner, input.RepoName)) {
     input.Logger.write(`${input.RepoName}: mirror ready; triggering mirror-sync`);
@@ -297,14 +297,14 @@ export async function startMirrorSyncAfterPush(input: {
   Owner: string;
   RepoName: string;
   ContentBranch: string;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): Promise<void> {
   requireGhCommand();
   await runMirrorSyncDispatch(input);
   await restoreMirrorContentDefaultBranch(input);
 }
 
-export function createMirrorPollGitHub(owner: string, logger: SyncLogger): MirrorPollGitHub {
+export function createMirrorPollGitHub(owner: string, logger: Logger): MirrorPollGitHub {
   return {
     async getBranchSha(repo, branch) {
       return ghGetBranchSha(owner, repo, branch);
@@ -319,7 +319,7 @@ export async function runMirrorPoll(input: {
   RepoRoot: string;
   Config: SyncConfig;
   GitHub: MirrorPollGitHub;
-  Logger: SyncLogger;
+  Logger: Logger;
 }): Promise<void> {
   const mirrorOwner = input.Config.Owner;
   for (const repo of getMirrorPollRepoNames(input.Config)) {
