@@ -1,5 +1,6 @@
 {
   "UpstreamUrl": "https://git.code.sf.net/p/mingw-w64/mingw-w64",
+  "PushViaSsh": false,
   "Branches": [
     { "Upstream": "master", "Mirror": "master" }
   ],

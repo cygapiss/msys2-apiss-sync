@@ -6,6 +6,8 @@ export interface MirrorSyncBranchPair {
 export interface MirrorSyncConfig {
   UpstreamUrl: string;
   Branches: MirrorSyncBranchPair[];
+  /** When true (default), push to GitHub via SSH; requires MIRROR_PUSH_SSH_KEY. */
+  PushViaSsh?: boolean;
   SyncTags?: boolean;
   Notify?: {
     Enabled?: boolean;

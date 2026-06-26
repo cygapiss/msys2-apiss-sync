@@ -19,6 +19,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     steps:
       - name: Checkout sync branch
         uses: actions/checkout@v5
@@ -27,10 +28,66 @@ jobs:
           # PAT with repo + workflow scopes; see docs/usage.md (SYNC_DISPATCH_TOKEN).
           token: ${{ secrets.SYNC_DISPATCH_TOKEN || github.token }}
 
+      - name: Read push transport
+        id: push
+        run: |
+          set -euo pipefail
+          CONFIG=".github/mirror-sync.json"
+          if [ ! -f "${CONFIG}" ]; then
+            echo "Missing ${CONFIG} on sync branch"
+            exit 1
+          fi
+          PUSH_VIA_SSH="$(jq -r '.PushViaSsh // true' "${CONFIG}")"
+          echo "via_ssh=${PUSH_VIA_SSH}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH push
+        if: steps.push.outputs.via_ssh == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MIRROR_PUSH_SSH_KEY }}
+
       - name: Sync from upstream
         id: sync
         run: |
           set -euo pipefail
+          PUSH_VIA_SSH="${{ steps.push.outputs.via_ssh }}"
+          if [ "${PUSH_VIA_SSH}" = "true" ]; then
+            git remote set-url --push origin "git@github.com:${GITHUB_REPOSITORY}.git"
+            echo "Push transport: SSH (git@github.com)"
+          else
+            # Fallback when PushViaSsh is false: HTTP/2 can reset mid-pack (curl 92).
+            git config --global http.version HTTP/1.1
+            git config --global http.postBuffer 524288000
+            echo "Push transport: HTTPS"
+          fi
+
+          push_mirror_ref() {
+            local refspec="$1"
+            local attempt
+            for attempt in 1 2 3 4 5; do
+              if git push origin "${refspec}"; then
+                return 0
+              fi
+              echo "Push attempt ${attempt} failed; retrying in 30s..."
+              sleep 30
+            done
+            echo "Push failed after 5 attempts: ${refspec}"
+            return 1
+          }
+
+          push_mirror_tags() {
+            local attempt
+            for attempt in 1 2 3 4 5; do
+              if git push origin --tags; then
+                return 0
+              fi
+              echo "Tag push attempt ${attempt} failed; retrying in 30s..."
+              sleep 30
+            done
+            echo "Tag push failed after 5 attempts"
+            return 1
+          }
+
           CONFIG=".github/mirror-sync.json"
           if [ ! -f "${CONFIG}" ]; then
             echo "Missing ${CONFIG} on sync branch"
@@ -78,9 +135,7 @@ jobs:
             echo "Advanced ${MIRROR_BRANCH} from ${BEFORE:-<none>} to ${AFTER}"
             ADVANCED=true
 
-            if ! git push origin "upstream/${UPSTREAM_BRANCH}:refs/heads/${MIRROR_BRANCH}"; then
-              git push --force-with-lease origin "upstream/${UPSTREAM_BRANCH}:refs/heads/${MIRROR_BRANCH}"
-            fi
+            push_mirror_ref "upstream/${UPSTREAM_BRANCH}:refs/heads/${MIRROR_BRANCH}"
 
             if [ -z "${PRIMARY_SHA}" ]; then
               PRIMARY_SHA="${AFTER}"
@@ -91,7 +146,7 @@ jobs:
           if [ "${SYNC_TAGS}" = "true" ]; then
             echo "Syncing tags from upstream"
             git fetch upstream --tags
-            git push origin --tags || true
+            push_mirror_tags || true
           fi
 
           if [ "${ADVANCED}" = "true" ]; then

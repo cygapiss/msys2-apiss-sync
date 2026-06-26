@@ -40,6 +40,40 @@ when upstream has `.github/workflows/*`) and for **repository_dispatch** to
 with no upstream workflow files (e.g. glibc) can omit the secret; checkout falls
 back to `GITHUB_TOKEN`.
 
+### Setup `MIRROR_PUSH_SSH_KEY` (SSH push, large mirrors)
+
+When `PushViaSsh` is true in `config/mirror-sync/<repo>.json` (default for new
+mirrors), mirror-sync pushes via `git@github.com:` instead of HTTPS. This avoids
+HTTP/2 disconnects on large initial syncs (e.g. gcc).
+
+1. **Generate a deploy key** (write access) or reuse one org-wide key pair:
+
+```bash
+ssh-keygen -t ed25519 -f mirror-push -N "" -C "msys2-apiss-mirror-push"
+```
+
+2. **Add the public key** (`mirror-push.pub`) as a **deploy key** with write
+   access on each mirror repo that uses SSH push (Settings -> Deploy keys).
+   The Actions secret alone is not enough; GitHub must have the matching public
+   key on the repo.
+
+```powershell
+gh api repos/msys2-apiss/gcc/keys `
+  -f title="mirror-push" `
+  -f key="$(Get-Content -Raw mirror-push.pub)" `
+  -f read_only=false
+```
+
+3. **Add the private key** as secret `MIRROR_PUSH_SSH_KEY` on those repos (or as
+   an organization secret shared by all mirrors):
+
+```powershell
+Get-Content -Raw mirror-push | gh secret set MIRROR_PUSH_SSH_KEY --repo msys2-apiss/gcc
+```
+
+`SYNC_DISPATCH_TOKEN` is still required for checkout and workflow dispatch;
+SSH is used only for `git push`.
+
 ### 1. Refresh mirrors from upstream
 
 Mirrors auto-refresh every ~15 minutes via [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on this repo (GitHub per-repo `*/5` cron is unreliable). Mirror-poll skips dispatch when each mirror content branch already matches upstream. Manual trigger on branch `sync` (workflows live there, not on `master`):
@@ -50,6 +84,7 @@ gh workflow run mirror-sync.yml --repo msys2-apiss/MINGW-packages --ref sync
 gh workflow run mirror-sync.yml --repo msys2-apiss/mingw-w64 --ref sync
 gh workflow run mirror-sync.yml --repo msys2-apiss/glibc --ref sync
 gh workflow run mirror-sync.yml --repo msys2-apiss/enscript --ref sync
+gh workflow run mirror-sync.yml --repo msys2-apiss/gcc --ref sync
 ```
 
 Each mirror repo uses the same workflow template

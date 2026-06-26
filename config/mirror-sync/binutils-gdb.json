@@ -1,5 +1,6 @@
 {
   "UpstreamUrl": "https://sourceware.org/git/binutils-gdb.git",
+  "PushViaSsh": false,
   "Branches": [
     { "Upstream": "master", "Mirror": "master" }
   ],

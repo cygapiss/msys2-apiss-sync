@@ -1,5 +1,6 @@
 {
   "UpstreamUrl": "https://github.com/msys2/MINGW-packages.git",
+  "PushViaSsh": false,
   "Branches": [
     { "Upstream": "master", "Mirror": "master" }
   ],

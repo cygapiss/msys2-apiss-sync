@@ -1,5 +1,6 @@
 {
   "UpstreamUrl": "https://sourceware.org/git/elfutils.git",
+  "PushViaSsh": false,
   "Branches": [
     { "Upstream": "main", "Mirror": "main" }
   ],

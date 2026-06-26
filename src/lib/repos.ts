@@ -395,6 +395,41 @@ function remoteGitBranchSha(url: string, branch: string): string | null {
   }
 }
 
+const GITHUB_HTTPS_ORIGIN = /^https:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?\/?$/;
+
+export function githubSshPushUrl(httpsOriginUrl: string): string | null {
+  const match = httpsOriginUrl.trim().match(GITHUB_HTTPS_ORIGIN);
+  if (!match) {
+    return null;
+  }
+  const repo = match[2]!.endsWith('.git') ? match[2]! : `${match[2]}.git`;
+  return `git@github.com:${match[1]}/${repo}`;
+}
+
+function ensureGithubSshPushUrl(mirrorPath: string, logger: SyncLogger): void {
+  let originUrl: string;
+  try {
+    originUrl = runGitText(mirrorPath, ['remote', 'get-url', 'origin']).trim();
+  } catch {
+    return;
+  }
+  const sshUrl = githubSshPushUrl(originUrl);
+  if (!sshUrl) {
+    return;
+  }
+  let pushUrl = originUrl;
+  try {
+    pushUrl = runGitText(mirrorPath, ['remote', 'get-url', '--push', 'origin']).trim();
+  } catch {
+    // no separate push URL yet
+  }
+  if (pushUrl === sshUrl) {
+    return;
+  }
+  runGit(mirrorPath, ['remote', 'set-url', '--push', 'origin', sshUrl], {}, 5, logger);
+  logger.write(`origin push URL: ${sshUrl}`);
+}
+
 export function pushMirrorContentBranch(
   mirrorPath: string,
   contentBranch: string,
@@ -411,6 +446,7 @@ export function pushMirrorContentBranch(
     logger.write(`${repoName}: ${contentBranch} already on origin`);
     return false;
   }
+  ensureGithubSshPushUrl(mirrorPath, logger);
   runGit(
     mirrorPath,
     ['push', '-u', 'origin', `${contentBranch}:${contentBranch}`],
@@ -439,6 +475,7 @@ export function pushMirrorSyncBranch(
       return false;
     }
   }
+  ensureGithubSshPushUrl(mirrorPath, logger);
   runGit(mirrorPath, ['push', '--force-with-lease', 'origin', MIRROR_SYNC_BRANCH], {}, 5, logger);
   logger.write(`Pushed ${MIRROR_SYNC_BRANCH} to origin for ${repoName}`);
   return true;

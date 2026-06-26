@@ -33,7 +33,9 @@ pure fast-forward copy of upstream (no workflow commits on master).
 Template: `config/mirror-template/mirror-sync.yml`. Per-repo JSON:
 `config/mirror-sync/<repo-name>.json` (applied to `sync/.github/mirror-sync.json`
 by `yarn fetch-mirrors`). All mirrors: `SYNC_DISPATCH_TOKEN` (PAT with `repo` and
-`workflow` scopes; git push and dispatch). Package mirrors: `Notify.Enabled`
+`workflow` scopes; checkout and dispatch). Mirrors with `PushViaSsh` true (default
+for new mirrors): `MIRROR_PUSH_SSH_KEY` (deploy key private key; git push via
+SSH). Package mirrors: `Notify.Enabled`
 true. Mirror-only: `Notify.Enabled` false (secret still required when upstream
 has `.github/workflows/*`). Mirror
 branches are exact fast-forward copies of upstream (`master` matches upstream
@@ -59,8 +61,10 @@ manual runs queue until the current run finishes.
 ## Secrets
 
 - `MSYS2_APISS_SYNC_TOKEN`: write access to `msys2-apiss/msys2-apiss` and this repo
-- `SYNC_DISPATCH_TOKEN`: every mirror repo; PAT with `repo` + `workflow` for git
-  push (exact sync) and repository_dispatch to `msys2-apiss-sync`
+- `SYNC_DISPATCH_TOKEN`: every mirror repo; PAT with `repo` + `workflow` for
+  checkout, workflow_dispatch, and repository_dispatch to `msys2-apiss-sync`
+- `MIRROR_PUSH_SSH_KEY`: mirror repos with `PushViaSsh` true; deploy key for
+  `git@github.com` push (avoids HTTPS HTTP/2 failures on large repos)
 - Never log tokens; pass via `env:` to script steps only.
 
 ## Push policy
