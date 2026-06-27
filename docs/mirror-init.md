@@ -145,8 +145,8 @@ push to origin when **`--push`**).
 
 ### Each mirror repo in scope
 
-Per mirror: init locally, then push content + sync branches when **`--push`**. See
-**Prepare and push** below.
+Per mirror: init locally, then push **`msys2-apiss-mirror-sync`** when **`--push`**. Block 3
+(mirror-sync) updates the content branch on GitHub. See **Prepare and push** below.
 
 #### Prepare and push
 
@@ -154,7 +154,6 @@ For each mirror in scope (one with **`--repo`**, or every entry in `Mirrors.Repo
 without it, in order):
 
 - Ensure GitHub repo exists (`gh repo create` when origin is empty).
-- Push **content branch** to `origin`.
 - Push **`msys2-apiss-mirror-sync`** to `origin` ([Tooling branch layout](#tooling-branch-layout)).
 - **Dispatch Block 3** for that mirror (always after push; no tip comparison). When
   `mirror-sync.yml` is not registered yet, briefly set default branch to

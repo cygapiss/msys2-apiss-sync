@@ -26,7 +26,7 @@ import {
 } from './layout.ts';
 import { ghRemoteHasBranch, ghRepoClone } from '../git/gh.ts';
 import { applyMirrorSyncToolings, mirrorSyncToolingsMatch } from './toolings.ts';
-import { githubSshPushUrl, runGit, runGitText, testGitAncestor } from '../git/index.ts';
+import { githubSshPushUrl, runGit, runGitText } from '../git/index.ts';
 import type { Logger } from '../git/log.ts';
 
 export const MIRROR_SYNC_COMMIT_MESSAGE =
@@ -234,45 +234,6 @@ function maybeEnsureGithubSshPushUrl(mirrorPath: string, logger: Logger): void {
   }
   runGit(mirrorPath, ['remote', 'set-url', '--push', 'origin', sshUrl], {}, 5, logger);
   logger.write(`origin push URL: ${sshUrl}`);
-}
-
-export function pushMirrorContentBranch(
-  mirrorPath: string,
-  contentBranch: string,
-  repoName: string,
-  logger: Logger
-): boolean {
-  if (!refExists(mirrorPath, contentBranch)) {
-    return false;
-  }
-  try {
-    runGit(mirrorPath, ['fetch', 'origin', '--prune'], {}, 5, logger);
-  } catch {
-    // Empty origin during bootstrap.
-  }
-  const local = runGitText(mirrorPath, ['rev-parse', contentBranch]).trim();
-  const originRef = `origin/${contentBranch}`;
-  const remote = refExists(mirrorPath, originRef)
-    ? runGitText(mirrorPath, ['rev-parse', originRef]).trim()
-    : null;
-  if (remote === local) {
-    logger.write(`${repoName}: ${contentBranch} already on origin`);
-    return false;
-  }
-  if (remote) {
-    if (testGitAncestor(mirrorPath, local, remote)) {
-      logger.write(`${repoName}: remote ${contentBranch} ahead of local; skip content push`);
-      return false;
-    }
-    if (!testGitAncestor(mirrorPath, remote, local)) {
-      logger.write(`${repoName}: ${contentBranch} diverges from origin; skip content push`, 'Warn');
-      return false;
-    }
-  }
-  maybeEnsureGithubSshPushUrl(mirrorPath, logger);
-  runGit(mirrorPath, ['push', '-u', 'origin', `${contentBranch}:${contentBranch}`], {}, 5, logger);
-  logger.write(`Pushed ${contentBranch} to origin for ${repoName}`);
-  return true;
 }
 
 export function pushMirrorSyncBranch(

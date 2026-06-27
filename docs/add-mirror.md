@@ -117,17 +117,17 @@ lives in `config/mirror-sync/<repo-name>.json` only.
 
 ### 2. Bootstrap on GitHub
 
-Run (creates the GitHub repo with `gh` when missing, pushes content root +
-`msys2-apiss-sync`, registers workflow, runs first sync, restores default branch):
+Run (creates the GitHub repo with `gh` when missing, pushes **`msys2-apiss-mirror-sync`**,
+dispatches mirror-sync; Block 3 pushes the content branch):
 
 ```bash
-yarn fetch-mirrors --repo my-tool --push
+yarn mirror-init --repo my-tool --push
 ```
 
 This fetches upstream commit graph blob:none, checks out the root commit only
-locally ([Tooling branch layout](mirror-init.md#tooling-branch-layout)), pushes that as `master`/`main`, pushes **`msys2-apiss-mirror-sync`**, triggers `mirror-sync`
-on GitHub (full upstream fetch happens in CI), then sets default back to the
-content branch without waiting for the run to finish.
+locally ([Tooling branch layout](mirror-init.md#tooling-branch-layout)), pushes
+**`msys2-apiss-mirror-sync`**, triggers `mirror-sync` on GitHub (Block 3 fetches
+upstream and pushes the content branch), then restores default branch when needed.
 
 Later, `yarn fetch-mirrors` clones into `.work/mirrors/my-tool/` on branch
 **`msys2-apiss-sync`** and applies `config/mirror-sync/my-tool.json` when templates differ.
@@ -147,7 +147,7 @@ dispatch on ref `msys2-apiss-sync` when the workflow file is on that branch.
 Or manually:
 
 ```bash
-# after pushing content root + msys2-apiss-sync locally
+# after pushing msys2-apiss-mirror-sync locally
 gh api repos/msys2-apiss/my-tool -X PATCH -f default_branch=msys2-apiss-sync
 gh workflow run mirror-sync.yml --repo msys2-apiss/my-tool --ref msys2-apiss-sync
 gh run watch --repo msys2-apiss/my-tool $(gh run list --repo msys2-apiss/my-tool --workflow mirror-sync.yml --limit 1 --json databaseId -q '.[0].databaseId')

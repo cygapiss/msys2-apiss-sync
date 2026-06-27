@@ -15,7 +15,6 @@ import { installMirrorMergeWorkflow } from './destination.ts';
 import {
   initializeNamedMirrorRepository,
   mirrorOriginHasContent,
-  pushMirrorContentBranch,
   pushMirrorSyncBranch
 } from './mirror.ts';
 import {
@@ -57,7 +56,6 @@ function pushMirrorRepo(input: {
       Logger: input.Logger
     });
   }
-  pushMirrorContentBranch(input.MirrorPath, input.ContentBranch, input.RepoName, input.Logger);
   pushMirrorSyncBranch(input.MirrorPath, input.RepoName, input.Logger);
   ghDispatchMirrorSyncForMirror(owner, input.RepoName, input.ContentBranch, input.Logger);
 }

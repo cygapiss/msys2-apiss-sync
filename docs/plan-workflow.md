@@ -50,7 +50,7 @@ All Block 1 init code lives in **`msys2-apiss/msys2-apiss-sync`**. Block 1 prepa
 | **`msys2-apiss/*`** (mirror repos) | Install Block 3 [`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml) + `mirror-sync.json` on branch **`msys2-apiss-mirror-sync`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)); bootstrap `.work/mirrors/<repo>/` locally |
 | **`msys2-apiss/msys2-apiss`** (destination) | Install Block 4 [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on branch **`msys2-apiss-mirror-merge`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)) |
 
-With **`--push`**, Block 1 pushes mirror workflow branches and content to **`msys2-apiss/*`**
+With **`--push`**, Block 1 pushes mirror workflow branches to **`msys2-apiss/*`**
 and the Block 4 workflow branch to **`msys2-apiss/msys2-apiss`**, then dispatches Block 3 on each pushed mirror repo.
 
 ---
