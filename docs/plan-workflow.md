@@ -142,8 +142,8 @@ CI: `GH_TOKEN` from `secrets.SYNC_DISPATCH_TOKEN` on `msys2-apiss/msys2-apiss-sy
 
 Block 2 also runs at end of Block 1 **`--push`** (after per-mirror Block 3 dispatch, GitHub dispatch of **`mirror-poll.yml`**).
 
-Keep: in-progress run skip; workflow registration bootstrap on 404; default-branch dance
-for first dispatch when needed.
+Keep: in-progress run skip; set tooling default branch before dispatch on new
+mirrors; retry dispatch once on 404 without waiting for workflow registration.
 
 ---
 

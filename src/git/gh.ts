@@ -133,48 +133,6 @@ export function ghSetRepoDefaultBranch(
   }
 }
 
-function sleepMs(ms: number): void {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    // Busy wait: mirror-init dispatch bootstrap runs synchronously after push.
-  }
-}
-
-function ghWorkflowRegistered(owner: string, repoName: string, workflowFile: string): boolean {
-  const workflowPath = `.github/workflows/${workflowFile}`;
-  const result = runGh([
-    'api',
-    `repos/${owner}/${repoName}/actions/workflows`,
-    '--jq',
-    `[.workflows[].path] | index("${workflowPath}") != null`
-  ]);
-  return result.ok && result.stdout === 'true';
-}
-
-function waitForWorkflowRegistration(input: {
-  Owner: string;
-  RepoName: string;
-  WorkflowFile: string;
-  Logger: Logger;
-  MaxAttempts?: number;
-  DelayMs?: number;
-}): boolean {
-  const maxAttempts = input.MaxAttempts ?? 12;
-  const delayMs = input.DelayMs ?? 5000;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    if (ghWorkflowRegistered(input.Owner, input.RepoName, input.WorkflowFile)) {
-      return true;
-    }
-    if (attempt < maxAttempts) {
-      input.Logger.write(
-        `${input.RepoName}: waiting for ${input.WorkflowFile} registration (${attempt}/${maxAttempts})`
-      );
-      sleepMs(delayMs);
-    }
-  }
-  return false;
-}
-
 function ghMirrorBlockRunInProgress(
   owner: string,
   repoName: string,
@@ -282,38 +240,44 @@ export function ghDispatchMirrorBlock(
   logger: Logger,
   options?: { ForbiddenDetail?: string }
 ): void {
-  logger.write(`Dispatching ${spec.Block} on ${owner}/${repoName}`);
-  let result = ghAttemptMirrorBlockDispatch(owner, repoName, spec, logger);
-  if (handleMirrorBlockDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
-    return;
-  }
-  logger.write(
-    `${repoName}: ${spec.WorkflowFile} not registered; setting default branch to ${spec.ToolingBranch}`
-  );
-  ghSetRepoDefaultBranch(owner, repoName, spec.ToolingBranch, logger);
+  const restoreDefaultBranch = ghRemoteHasBranch(owner, repoName, defaultBranch);
+  let toolingDefaultBranch = false;
+
   try {
-    if (
-      !waitForWorkflowRegistration({
-        Owner: owner,
-        RepoName: repoName,
-        WorkflowFile: spec.WorkflowFile,
-        Logger: logger
-      })
-    ) {
-      throw new Error(
-        `${spec.Block} failed for ${owner}/${repoName}: ${spec.WorkflowFile} not registered after waiting`
-      );
-    }
-    result = ghAttemptMirrorBlockDispatch(owner, repoName, spec, logger);
-    handleMirrorBlockDispatchResult(result, owner, repoName, spec, logger, options);
-  } finally {
-    if (ghRemoteHasBranch(owner, repoName, defaultBranch)) {
-      ghSetRepoDefaultBranch(owner, repoName, defaultBranch, logger);
-    } else {
+    if (!restoreDefaultBranch) {
       logger.write(
-        `${repoName}: ${defaultBranch} not on origin yet; leaving default branch unchanged`,
-        'Warn'
+        `${repoName}: ${defaultBranch} not on origin; setting default branch to ${spec.ToolingBranch} before dispatch`
       );
+      ghSetRepoDefaultBranch(owner, repoName, spec.ToolingBranch, logger);
+      toolingDefaultBranch = true;
+    }
+
+    logger.write(`Dispatching ${spec.Block} on ${owner}/${repoName}`);
+    let result = ghAttemptMirrorBlockDispatch(owner, repoName, spec, logger);
+    if (handleMirrorBlockDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
+      return;
+    }
+
+    if (!toolingDefaultBranch) {
+      logger.write(
+        `${repoName}: ${spec.WorkflowFile} not registered; setting default branch to ${spec.ToolingBranch}`
+      );
+      ghSetRepoDefaultBranch(owner, repoName, spec.ToolingBranch, logger);
+      toolingDefaultBranch = true;
+    }
+
+    result = ghAttemptMirrorBlockDispatch(owner, repoName, spec, logger);
+    if (handleMirrorBlockDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
+      return;
+    }
+
+    logger.write(
+      `${repoName}: ${spec.WorkflowFile} not registered yet; dispatch skipped (re-run mirror-init --push or gh workflow run later)`,
+      'Warn'
+    );
+  } finally {
+    if (restoreDefaultBranch) {
+      ghSetRepoDefaultBranch(owner, repoName, defaultBranch, logger);
     }
   }
 }
