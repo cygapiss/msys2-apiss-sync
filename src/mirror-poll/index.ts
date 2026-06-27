@@ -9,6 +9,7 @@ import {
 import type { Logger } from '../git/log.ts';
 import type { MirrorSyncConfig } from '../types/mirror-sync-config.ts';
 import { ghDispatchMirrorBlock, ghGetBranchSha, MIRROR_SYNC_BLOCK, requireGhAuthenticated } from '../git/gh.ts';
+import { gitLsRemoteBranchSha } from '../git/index.ts';
 
 export { getMirrorPollRepoNames, loadMirrorPollConfig } from '../mirror-init/config.ts';
 
@@ -20,8 +21,19 @@ export function parseGitHubRepoFromUrl(url: string): { Owner: string; Repo: stri
   return { Owner: match[1], Repo: match[2] };
 }
 
-function fetchBranchSha(owner: string, repo: string, branch: string): string | null {
+function fetchMirrorBranchSha(owner: string, repo: string, branch: string): string | null {
   return ghGetBranchSha(owner, repo, branch);
+}
+
+export function fetchUpstreamBranchSha(upstreamUrl: string, branch: string): string | null {
+  const github = parseGitHubRepoFromUrl(upstreamUrl);
+  if (github) {
+    const sha = ghGetBranchSha(github.Owner, github.Repo, branch);
+    if (sha) {
+      return sha;
+    }
+  }
+  return gitLsRemoteBranchSha(upstreamUrl, branch);
 }
 
 function dispatchMirrorSync(
@@ -60,22 +72,12 @@ export async function mirrorRepoPollStatus(input: {
 }): Promise<MirrorRepoPollStatus> {
   const getUpstreamSha =
     input.GetUpstreamSha ??
-    (async (url, branch) => {
-      const upstream = parseGitHubRepoFromUrl(url);
-      if (!upstream) {
-        return null;
-      }
-      return fetchBranchSha(upstream.Owner, upstream.Repo, branch);
-    });
+    ((url, branch) => fetchUpstreamBranchSha(url, branch));
   const getMirrorSha =
     input.GetMirrorSha ??
-    ((repo, branch) => fetchBranchSha(input.MirrorOwner, repo, branch));
+    ((repo, branch) => fetchMirrorBranchSha(input.MirrorOwner, repo, branch));
 
   if (!input.MirrorConfig?.UpstreamUrl || !input.MirrorConfig.Branches?.length) {
-    return 'invalid';
-  }
-
-  if (!parseGitHubRepoFromUrl(input.MirrorConfig.UpstreamUrl)) {
     return 'invalid';
   }
 

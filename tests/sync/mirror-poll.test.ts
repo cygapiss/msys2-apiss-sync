@@ -1,6 +1,13 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
-import { mirrorRepoNeedsSync, mirrorRepoPollStatus, parseGitHubRepoFromUrl } from '../../src/mirror-poll/index.ts';
+import {
+  fetchUpstreamBranchSha,
+  mirrorRepoNeedsSync,
+  mirrorRepoPollStatus,
+  parseGitHubRepoFromUrl
+} from '../../src/mirror-poll/index.ts';
+import * as git from '../../src/git/index.ts';
+import * as gh from '../../src/git/gh.ts';
 import type { MirrorSyncConfig } from '../../src/types/mirror-sync-config.ts';
 
 function mirrorConfig(overrides: Partial<MirrorSyncConfig> = {}): MirrorSyncConfig {
@@ -72,13 +79,14 @@ describe('mirrorRepoNeedsSync', () => {
     })).resolves.toBe('invalid');
   });
 
-  test('returns invalid when upstream is not on GitHub', async () => {
+  test('returns invalid when upstream tip cannot be read', async () => {
     await expect(mirrorRepoNeedsSync({
       RepoName: 'gcc',
       MirrorOwner: 'msys2-apiss',
       MirrorConfig: mirrorConfig({
         UpstreamUrl: 'https://gcc.gnu.org/git/gcc.git'
       }),
+      GetUpstreamSha: () => null,
       GetMirrorSha: () => 'abc123'
     })).resolves.toBe(false);
     await expect(mirrorRepoPollStatus({
@@ -87,7 +95,43 @@ describe('mirrorRepoNeedsSync', () => {
       MirrorConfig: mirrorConfig({
         UpstreamUrl: 'https://gcc.gnu.org/git/gcc.git'
       }),
+      GetUpstreamSha: () => null,
       GetMirrorSha: () => 'abc123'
     })).resolves.toBe('invalid');
+  });
+
+  test('returns differ for non-GitHub upstream when tips differ', async () => {
+    await expect(mirrorRepoPollStatus({
+      RepoName: 'glibc',
+      MirrorOwner: 'msys2-apiss',
+      MirrorConfig: mirrorConfig({
+        UpstreamUrl: 'https://sourceware.org/git/glibc.git'
+      }),
+      GetUpstreamSha: () => 'upstream-sha',
+      GetMirrorSha: () => 'mirror-sha'
+    })).resolves.toBe('differ');
+  });
+});
+
+describe('fetchUpstreamBranchSha', () => {
+  test('uses gh for GitHub upstream URLs', () => {
+    const ghSpy = vi.spyOn(gh, 'ghGetBranchSha').mockReturnValue('github-sha');
+    const lsRemoteSpy = vi.spyOn(git, 'gitLsRemoteBranchSha');
+
+    expect(fetchUpstreamBranchSha('https://github.com/msys2/MSYS2-packages.git', 'master')).toBe(
+      'github-sha'
+    );
+    expect(ghSpy).toHaveBeenCalledWith('msys2', 'MSYS2-packages', 'master');
+    expect(lsRemoteSpy).not.toHaveBeenCalled();
+
+    ghSpy.mockRestore();
+    lsRemoteSpy.mockRestore();
+  });
+
+  test('falls back to git ls-remote for non-GitHub upstream URLs', () => {
+    vi.spyOn(gh, 'ghGetBranchSha').mockReturnValue(null);
+    vi.spyOn(git, 'gitLsRemoteBranchSha').mockReturnValue('ls-remote-sha');
+
+    expect(fetchUpstreamBranchSha('https://gcc.gnu.org/git/gcc.git', 'master')).toBe('ls-remote-sha');
   });
 });

@@ -154,3 +154,20 @@ export function githubSshPushUrl(httpsOriginUrl: string): string | null {
   const repo = match[2]!.endsWith('.git') ? match[2]! : `${match[2]}.git`;
   return `git@github.com:${match[1]}/${repo}`;
 }
+
+export function gitLsRemoteBranchSha(url: string, branch: string): string | null {
+  try {
+    const output = runGitText(null, ['ls-remote', url, `refs/heads/${branch}`]).trim();
+    if (!output) {
+      return null;
+    }
+    const firstLine = output.split('\n')[0]?.trim();
+    if (!firstLine) {
+      return null;
+    }
+    const sha = firstLine.split(/\s+/)[0]?.trim();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
