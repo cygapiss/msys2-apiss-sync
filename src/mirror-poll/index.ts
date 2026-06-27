@@ -3,8 +3,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { Logger } from '../git/log.ts';
-import { GITHUB_API, MIRROR_SYNC_BRANCH, WORKFLOW_DISPATCH_MIRROR_SYNC } from '../types/constants.ts';
+import { WORKFLOW_DISPATCH_MIRROR_SYNC } from '../types/constants.ts';
 import type { MirrorSyncConfig } from '../types/mirror-sync-config.ts';
+import { ghDispatchMirrorSyncWorkflow, ghGetBranchSha, requireGhAuthenticated } from '../git/gh.ts';
+import { printMirrorPollCliHelp, readStringOption, wantsHelp } from './args.ts';
 
 export interface SyncConfig {
   Owner: string;
@@ -67,54 +69,25 @@ export function parseGitHubRepoFromUrl(url: string): { Owner: string; Repo: stri
   return { Owner: match[1], Repo: match[2] };
 }
 
-function getGitHubToken(): string {
-  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
-  if (!token) {
-    throw new Error('GITHUB_TOKEN or GH_TOKEN is required');
-  }
-  return token;
+function fetchBranchSha(owner: string, repo: string, branch: string): string | null {
+  return ghGetBranchSha(owner, repo, branch);
 }
 
-async function githubFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(init.headers);
-  headers.set('Authorization', `Bearer ${getGitHubToken()}`);
-  headers.set('Accept', 'application/vnd.github+json');
-  headers.set('X-GitHub-Api-Version', '2022-11-28');
-  return fetch(`${GITHUB_API}${path}`, { ...init, headers });
-}
-
-async function fetchBranchSha(owner: string, repo: string, branch: string): Promise<string | null> {
-  const response = await githubFetch(
-    `/repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`
-  );
-  if (response.status === 404) {
-    return null;
+function dispatchMirrorSync(owner: string, repo: string, logger: Logger): void {
+  const result = ghDispatchMirrorSyncWorkflow(owner, repo, logger);
+  if (result.ok) {
+    logger.write(`dispatched ${owner}/${repo}`);
+    return;
   }
-  if (!response.ok) {
-    throw new Error(`GitHub API ${response.status} for ${owner}/${repo}@${branch}`);
+  if (result.skipped) {
+    return;
   }
-  const body = (await response.json()) as { commit?: { sha?: string } };
-  return body.commit?.sha ?? null;
-}
-
-async function dispatchMirrorSync(owner: string, repo: string, logger: Logger): Promise<void> {
-  const response = await githubFetch(
-    `/repos/${owner}/${repo}/actions/workflows/mirror-sync.yml/dispatches`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ref: MIRROR_SYNC_BRANCH,
-        inputs: {
-          event_type: WORKFLOW_DISPATCH_MIRROR_SYNC
-        }
-      })
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`${WORKFLOW_DISPATCH_MIRROR_SYNC} failed for ${owner}/${repo} (${response.status})`);
+  if (result.notFound) {
+    throw new Error(
+      `${WORKFLOW_DISPATCH_MIRROR_SYNC} failed for ${owner}/${repo}: mirror-sync.yml not found`
+    );
   }
-  logger.write(`dispatched ${owner}/${repo}`);
+  throw new Error(`${WORKFLOW_DISPATCH_MIRROR_SYNC} failed for ${owner}/${repo}`);
 }
 
 function createLogger(): Logger {
@@ -166,20 +139,27 @@ export async function mirrorRepoNeedsSync(input: {
   return false;
 }
 
-export async function runMirrorPoll(): Promise<void> {
+export async function runMirrorPoll(input: { RepoFilter?: string } = {}): Promise<void> {
   process.env.LANG = 'C.UTF-8';
   process.env.LC_ALL = 'C.UTF-8';
 
-  getGitHubToken();
+  requireGhAuthenticated();
 
   const logger = createLogger();
   const repoRoot = getSyncRepoRoot();
   const config = loadSyncConfig(repoRoot);
   const mirrorOwner = config.Owner;
 
+  if (input.RepoFilter && !getMirrorPollRepoNames(config).includes(input.RepoFilter)) {
+    throw new Error(`Unknown mirror repo: ${input.RepoFilter}`);
+  }
+
   logger.write('start');
 
   for (const repo of getMirrorPollRepoNames(config)) {
+    if (input.RepoFilter && input.RepoFilter !== repo) {
+      continue;
+    }
     const mirrorConfig = loadMirrorSyncConfigFile(repoRoot, repo);
     if (!(await mirrorRepoNeedsSync({
       RepoName: repo,
@@ -190,16 +170,24 @@ export async function runMirrorPoll(): Promise<void> {
       continue;
     }
     logger.write(`${repo}: tips differ`);
-    await dispatchMirrorSync(mirrorOwner, repo, logger);
+    dispatchMirrorSync(mirrorOwner, repo, logger);
   }
 
   logger.write('done');
 }
 
 export async function runMirrorPollCli(): Promise<void> {
+  const args = process.argv.slice(2);
+  if (wantsHelp(args)) {
+    printMirrorPollCliHelp();
+    return;
+  }
+
   const logger = createLogger();
   try {
-    await runMirrorPoll();
+    await runMirrorPoll({
+      RepoFilter: readStringOption(args, '--repo')
+    });
   } catch (error) {
     logger.write(error instanceof Error ? error.message : String(error), 'Error');
     process.exitCode = 1;

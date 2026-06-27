@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
-import type { Logger } from '../git/log.ts';
+import type { Logger } from './log.ts';
+import { MIRROR_SYNC_BRANCH, WORKFLOW_DISPATCH_MIRROR_SYNC } from '../types/constants.ts';
 
 export function runGh(args: string[]): { ok: boolean; stdout: string; stderr: string } {
   const result = spawnSync('gh', args, {
@@ -88,4 +89,71 @@ export function ghRemoteHasBranch(owner: string, repoName: string, branch: strin
     '.name'
   ]);
   return result.ok && result.stdout === branch;
+}
+
+export function ghGetBranchSha(owner: string, repoName: string, branch: string): string | null {
+  const result = runGh([
+    'api',
+    `repos/${owner}/${repoName}/branches/${encodeURIComponent(branch)}`,
+    '--jq',
+    '.commit.sha'
+  ]);
+  if (!result.ok) {
+    return null;
+  }
+  return result.stdout || null;
+}
+
+function ghMirrorSyncRunInProgress(owner: string, repoName: string): boolean | null {
+  const result = runGh([
+    'run',
+    'list',
+    '--repo',
+    `${owner}/${repoName}`,
+    '--workflow',
+    'mirror-sync.yml',
+    '--branch',
+    MIRROR_SYNC_BRANCH,
+    '--status',
+    'in_progress',
+    '--limit',
+    '1',
+    '--json',
+    'databaseId',
+    '-q',
+    'length'
+  ]);
+  if (!result.ok) {
+    return null;
+  }
+  return result.stdout !== '0' && result.stdout.length > 0;
+}
+
+export function ghDispatchMirrorSyncWorkflow(
+  owner: string,
+  repoName: string,
+  logger?: Logger
+): { ok: boolean; skipped?: boolean; notFound?: boolean } {
+  const inProgress = ghMirrorSyncRunInProgress(owner, repoName);
+  if (inProgress === true) {
+    logger?.write(`Skip mirror-sync dispatch on ${owner}/${repoName}: run already in progress`);
+    return { ok: false, skipped: true };
+  }
+  const result = runGh([
+    'workflow',
+    'run',
+    'mirror-sync.yml',
+    '--repo',
+    `${owner}/${repoName}`,
+    '--ref',
+    MIRROR_SYNC_BRANCH,
+    '-f',
+    `event_type=${WORKFLOW_DISPATCH_MIRROR_SYNC}`
+  ]);
+  if (result.ok) {
+    return { ok: true };
+  }
+  const detail = `${result.stderr} ${result.stdout}`.toLowerCase();
+  const notFound = detail.includes('404') || detail.includes('not found');
+  return { ok: false, notFound };
 }

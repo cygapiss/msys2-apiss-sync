@@ -12,7 +12,7 @@ import {
   MIRROR_SYNC_BRANCH
 } from './config.ts';
 import { installMirrorMergeWorkflow } from './destination.ts';
-import { ghRepoCreate, requireGhAuthenticated } from './gh.ts';
+import { ghRepoCreate, requireGhAuthenticated } from '../git/gh.ts';
 import {
   initializeNamedMirrorRepository,
   mirrorOriginHasContent,
@@ -37,10 +37,14 @@ function getBranchTip(mirrorPath: string, branch: string): string {
   return runGitText(mirrorPath, ['rev-parse', branch]).trim();
 }
 
-function runMirrorPollSubprocess(repoRoot: string, logger: Logger): void {
+function runMirrorPollSubprocess(repoRoot: string, logger: Logger, repoFilter?: string): void {
   const pollCli = join(repoRoot, 'src', 'mirror-poll', 'cli.ts');
+  const pollArgs = [pollCli];
+  if (repoFilter) {
+    pollArgs.push('--repo', repoFilter);
+  }
   logger.write('Running mirror-poll after push');
-  const result = spawnSync(process.execPath, [pollCli], {
+  const result = spawnSync(process.execPath, pollArgs, {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -143,7 +147,7 @@ export async function runMirrorInit(input: {
   });
 
   if (input.Push) {
-    runMirrorPollSubprocess(repoRoot, logger);
+    runMirrorPollSubprocess(repoRoot, logger, input.RepoFilter);
   }
 
   logger.write('done');

@@ -18,7 +18,7 @@ import {
   MIRROR_SYNC_BRANCH,
   type SyncConfig
 } from './config.ts';
-import { ghRemoteHasBranch, ghRepoClone } from './gh.ts';
+import { ghRemoteHasBranch, ghRepoClone } from '../git/gh.ts';
 import {
   applyMirrorSyncToolings,
   mirrorSyncToolingsMatch

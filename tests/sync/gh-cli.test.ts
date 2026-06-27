@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, test, vi } from 'vitest';
 
-import { ghCommandAvailable, ghRepoCreate, ghRepoExists } from '../../src/mirror-init/gh.ts';
+import { ghCommandAvailable, ghRepoCreate, ghRepoExists } from '../../src/git/gh.ts';
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn()

@@ -6,7 +6,7 @@ import {
   MIRROR_MERGE_BRANCH,
   type SyncConfig
 } from './config.ts';
-import { ghRemoteHasBranch, ghRepoClone } from './gh.ts';
+import { ghRemoteHasBranch, ghRepoClone } from '../git/gh.ts';
 import { runGit, runGitText } from '../git/index.ts';
 import type { Logger } from '../git/log.ts';
 
