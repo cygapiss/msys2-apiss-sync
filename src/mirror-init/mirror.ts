@@ -138,7 +138,12 @@ export function applyMirrorSyncTemplate(input: {
   ContentBranch: string;
   Logger: Logger;
   RepoRoot?: string;
+  NeedsBootstrap?: boolean;
 }): boolean {
+  if (input.NeedsBootstrap === false) {
+    input.Logger.write(`${input.RepoName}: config digest pinned; skipping template apply`);
+    return false;
+  }
   const repoRoot = input.RepoRoot ?? getSyncRepoRoot();
   const configPath = getMirrorSyncConfigPath(repoRoot, input.RepoName);
   const workflowPath = getMirrorSyncWorkflowTemplatePath(repoRoot);
@@ -262,6 +267,7 @@ export function initializeNamedMirrorRepository(input: {
   Owner: string;
   SkipFetch: boolean;
   Logger: Logger;
+  NeedsBootstrap?: boolean;
 }): string {
   const mirrorRoot = join(input.WorkDirectory, 'mirrors');
   mkdirSync(mirrorRoot, { recursive: true });
@@ -310,7 +316,8 @@ export function initializeNamedMirrorRepository(input: {
     MirrorPath: mirrorPath,
     RepoName: input.RepoName,
     ContentBranch: input.ContentBranch,
-    Logger: input.Logger
+    Logger: input.Logger,
+    NeedsBootstrap: input.NeedsBootstrap
   });
   setGitRepoUtf8Encoding(mirrorPath);
   return mirrorPath;

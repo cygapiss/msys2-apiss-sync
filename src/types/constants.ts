@@ -39,6 +39,9 @@ export const MIRROR_MERGE_CONFIG_PATH = 'config/mirror-merge.json';
 /** Block 2 poll config in the tooling repo. */
 export const MIRROR_POLL_CONFIG_PATH = 'config/mirror-poll.json';
 
+/** Repo -> config-tree digest map (mirror-init --push only). */
+export const TOOLING_DIGEST_PATH = 'config/digest.json';
+
 /** This tooling repository (Block 2 workflows on main). */
 export const TOOLING_REPO = 'msys2-apiss-sync';
 

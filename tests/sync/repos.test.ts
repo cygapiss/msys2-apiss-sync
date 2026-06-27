@@ -373,6 +373,44 @@ describe('applyMirrorSyncTemplate', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test('skips apply when config digest is pinned', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-apply-digest-'));
+    try {
+      const syncRepoRoot = join(root, 'sync-repo');
+      const mirrorPath = join(root, 'mirror');
+      mkdirSync(join(syncRepoRoot, 'config', 'mirror-sync'), { recursive: true });
+      mkdirSync(join(syncRepoRoot, 'config', 'mirror-template'), { recursive: true });
+      writeFileSync(
+        join(syncRepoRoot, 'config', 'mirror-sync', 'mirror.json'),
+        '{"UpstreamUrl":"https://example.com/up.git","Branches":[{"Upstream":"master","Mirror":"master"}]}\n',
+        'utf8'
+      );
+      writeFileSync(join(syncRepoRoot, 'config', 'mirror-template', 'mirror-sync.yml'), 'name: test\n', 'utf8');
+
+      initTestRepo(mirrorPath);
+      writeFileSync(join(mirrorPath, 'pkg.txt'), 'pkg\n', 'utf8');
+      runGit(mirrorPath, ['add', 'pkg.txt']);
+      runGit(mirrorPath, ['commit', '-m', 'root']);
+      const masterRoot = runGit(mirrorPath, ['rev-parse', 'HEAD']).trim();
+      runGit(mirrorPath, ['update-ref', 'refs/remotes/origin/master', masterRoot]);
+      runGit(mirrorPath, ['checkout', '-b', MIRROR_SYNC_BRANCH, masterRoot]);
+      const syncSha = runGit(mirrorPath, ['rev-parse', MIRROR_SYNC_BRANCH]).trim();
+
+      const skipped = applyMirrorSyncTemplate({
+        MirrorPath: mirrorPath,
+        RepoName: 'mirror',
+        ContentBranch: 'master',
+        Logger: noopLogger,
+        RepoRoot: syncRepoRoot,
+        NeedsBootstrap: false
+      });
+      expect(skipped).toBe(false);
+      expect(runGit(mirrorPath, ['rev-parse', MIRROR_SYNC_BRANCH]).trim()).toBe(syncSha);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('pushMirrorContentBranchIfMissing', () => {

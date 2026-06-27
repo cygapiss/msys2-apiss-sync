@@ -38,7 +38,13 @@ function applyMirrorMergeTemplate(input: {
   RepoRoot: string;
   DefaultBranch: string;
   Logger: Logger;
+  DestinationRepo: string;
+  NeedsBootstrap?: boolean;
 }): boolean {
+  if (input.NeedsBootstrap === false) {
+    input.Logger.write(`${input.DestinationRepo}: config digest pinned; skipping template apply`);
+    return false;
+  }
   const templatePath = getMirrorMergeWorkflowTemplatePath(input.RepoRoot);
   if (!existsSync(templatePath)) {
     throw new Error(`Missing mirror-merge template: ${templatePath}`);
@@ -72,6 +78,7 @@ export function initializeDestinationRepository(input: {
   DefaultBranch: string;
   SkipFetch: boolean;
   Logger: Logger;
+  NeedsBootstrap?: boolean;
 }): string {
   const owner = input.Owner;
   const repo = input.DestinationRepo;
@@ -96,12 +103,16 @@ export function initializeDestinationRepository(input: {
     RepoPath: repoPath,
     RepoRoot: input.RepoRoot,
     DefaultBranch: defaultBranch,
-    Logger: input.Logger
+    Logger: input.Logger,
+    DestinationRepo: repo,
+    NeedsBootstrap: input.NeedsBootstrap
   });
-  if (updated) {
-    input.Logger.write(`Updated ${MIRROR_MERGE_BRANCH} workflow on ${owner}/${repo}`);
-  } else {
-    input.Logger.write(`${owner}/${repo}: ${MIRROR_MERGE_BRANCH} workflow already matches template`);
+  if (input.NeedsBootstrap !== false) {
+    if (updated) {
+      input.Logger.write(`Updated ${MIRROR_MERGE_BRANCH} workflow on ${owner}/${repo}`);
+    } else {
+      input.Logger.write(`${owner}/${repo}: ${MIRROR_MERGE_BRANCH} workflow already matches template`);
+    }
   }
   setGitRepoUtf8Encoding(repoPath);
   return repoPath;

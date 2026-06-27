@@ -28,6 +28,13 @@ import {
 import { runGitText } from '../git/index.ts';
 import type { Logger } from '../git/log.ts';
 import {
+  computeConfigTreeDigest,
+  loadDigestMap,
+  pinRepoDigest,
+  repoNeedsBootstrap,
+  saveDigestMap
+} from '../lib/tooling-digest.ts';
+import {
   MIRROR_MERGE_BRANCH,
   MIRROR_SYNC_BRANCH,
   TOOLING_DEFAULT_BRANCH,
@@ -111,10 +118,15 @@ export async function runMirrorInit(input: {
   const logger = createLogger();
   logger.write('start');
 
+  const currentDigest = computeConfigTreeDigest(repoRoot);
+  const digestMap = loadDigestMap(repoRoot, logger);
+  let digestMapDirty = false;
+
   if (input.RepoFilter && !getMirrorPollRepoNames(mirrorPollConfig).includes(input.RepoFilter)) {
     throw new Error(`Unknown mirror repo: ${input.RepoFilter}`);
   }
 
+  const destinationNeedsBootstrap = repoNeedsBootstrap(digestMap, destinationRepo, currentDigest);
   const destinationPath = initializeDestinationRepository({
     RepoRoot: repoRoot,
     WorkDirectory: work,
@@ -122,16 +134,23 @@ export async function runMirrorInit(input: {
     DestinationRepo: destinationRepo,
     DefaultBranch: defaultBranch,
     SkipFetch: Boolean(input.SkipFetch),
-    Logger: logger
+    Logger: logger,
+    NeedsBootstrap: destinationNeedsBootstrap
   });
   if (input.Push) {
-    pushDestinationRepo({
-      RepoPath: destinationPath,
-      Owner: owner,
-      DestinationRepo: destinationRepo,
-      DefaultBranch: defaultBranch,
-      Logger: logger
-    });
+    if (destinationNeedsBootstrap) {
+      pushDestinationRepo({
+        RepoPath: destinationPath,
+        Owner: owner,
+        DestinationRepo: destinationRepo,
+        DefaultBranch: defaultBranch,
+        Logger: logger
+      });
+      pinRepoDigest(digestMap, destinationRepo, currentDigest);
+      digestMapDirty = true;
+    } else {
+      logger.write(`${destinationRepo}: config digest pinned; skipping push/dispatch`);
+    }
   }
   const mergeTip = runGitText(destinationPath, ['rev-parse', MIRROR_MERGE_BRANCH]).trim();
   logger.write(
@@ -143,23 +162,31 @@ export async function runMirrorInit(input: {
       continue;
     }
     const contentBranch = getMirrorContentBranch(repoRoot, repoName);
+    const mirrorNeedsBootstrap = repoNeedsBootstrap(digestMap, repoName, currentDigest);
     const mirrorPath = initializeNamedMirrorRepository({
       WorkDirectory: work,
       RepoName: repoName,
       ContentBranch: contentBranch,
       Owner: owner,
       SkipFetch: Boolean(input.SkipFetch),
-      Logger: logger
+      Logger: logger,
+      NeedsBootstrap: mirrorNeedsBootstrap
     });
     if (input.Push) {
-      pushMirrorRepo({
-        RepoRoot: repoRoot,
-        RepoName: repoName,
-        MirrorPath: mirrorPath,
-        ContentBranch: contentBranch,
-        Owner: owner,
-        Logger: logger
-      });
+      if (mirrorNeedsBootstrap) {
+        pushMirrorRepo({
+          RepoRoot: repoRoot,
+          RepoName: repoName,
+          MirrorPath: mirrorPath,
+          ContentBranch: contentBranch,
+          Owner: owner,
+          Logger: logger
+        });
+        pinRepoDigest(digestMap, repoName, currentDigest);
+        digestMapDirty = true;
+      } else {
+        logger.write(`${repoName}: config digest pinned; skipping push/dispatch`);
+      }
     }
     const syncTip = runGitText(mirrorPath, ['rev-parse', MIRROR_SYNC_BRANCH]).trim();
     const tip = runGitText(mirrorPath, ['rev-parse', contentBranch]).trim();
@@ -176,6 +203,10 @@ export async function runMirrorInit(input: {
       TOOLING_DEFAULT_BRANCH,
       logger
     );
+    if (digestMapDirty) {
+      saveDigestMap(repoRoot, digestMap);
+      logger.write('updated config/digest.json');
+    }
   }
   logger.write('done');
 }
