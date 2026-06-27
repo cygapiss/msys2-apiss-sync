@@ -27,6 +27,7 @@ import { applyToolings, MIRROR_SYNC_TOOLINGS_SPEC, toolingsMatch } from './tooli
 import {
   defaultBranchRef,
   ensureToolingBranchCheckout,
+  pushDefaultBranchIfMissing,
   pushToolingBranch,
   repairToolingBranchLayout,
   setGitRepoUtf8Encoding
@@ -219,6 +220,20 @@ function maybeEnsureGithubSshPushUrl(mirrorPath: string, logger: Logger): void {
   }
   runGit(mirrorPath, ['remote', 'set-url', '--push', 'origin', sshUrl], {}, 5, logger);
   logger.write(`origin push URL: ${sshUrl}`);
+}
+
+export function pushMirrorContentBranchIfMissing(
+  mirrorPath: string,
+  contentBranch: string,
+  repoName: string,
+  logger: Logger
+): boolean {
+  return pushDefaultBranchIfMissing({
+    RepoPath: mirrorPath,
+    DefaultBranch: contentBranch,
+    Label: repoName,
+    Logger: logger
+  });
 }
 
 export function pushMirrorSyncBranch(

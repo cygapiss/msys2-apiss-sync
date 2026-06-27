@@ -127,7 +127,8 @@ Only the branch name, local path, and template files differ.
 4. Log tooling-branch tip.
 
 Mirror repos only: empty GitHub origin uses upstream bootstrap per [Tooling branch layout](#tooling-branch-layout).
-Block 3 (mirror-sync) updates the mirror content branch on GitHub; Block 1 does not push it.
+Block 3 (mirror-sync) updates the mirror content branch on GitHub; Block 1 pushes the content
+branch during **`--push`** only when it is missing on origin (first bootstrap).
 
 ### Local working copy states (mirrors)
 
@@ -149,13 +150,16 @@ when possible.
 
 ### With `--push` (after all targets initialized)
 
-**Destination:** push **`msys2-apiss-mirror-merge`** to origin, then dispatch Block 4 with
+**Destination:** when default branch (`main`) is missing on origin, push it first; then push
+**`msys2-apiss-mirror-merge`** to origin, then dispatch Block 4 with
 `gh workflow run mirror-merge.yml` on ref **`msys2-apiss-mirror-merge`** (same bootstrap
 pattern as mirror-sync when the workflow is not registered yet).
 
 **Each mirror in scope** (one with **`--repo`**, or every entry in `config/mirror-poll.json` `Repos` without it):
 
 - Ensure GitHub repo exists (`gh repo create` when origin is empty).
+- Push the **content branch** (`master` or configured `Branches[].Mirror`) when missing on
+  origin (first bootstrap; sets GitHub default branch before tooling).
 - Push **`msys2-apiss-mirror-sync`** to `origin`.
 - **Dispatch Block 3** (always after push; no tip comparison). When `mirror-sync.yml` is not
   registered yet, briefly set default branch to **`msys2-apiss-mirror-sync`**, dispatch, then
@@ -204,17 +208,18 @@ that you must push **`master`** (or the configured content branch) first.
 
 ### What causes it
 
-- **`mirror-init --push` pushes only `msys2-apiss-mirror-sync`** (tooling branch). It does
-  not push the content branch (`master` or `Branches[].Mirror` in config).
+- On first **`--push`**, Block 1 pushes the **content branch** when missing on origin, then
+  **`msys2-apiss-mirror-sync`**. GitHub may still need time to index the workflow after the
+  tooling-branch push.
 - `mirror-sync.yml` lives on **`msys2-apiss-mirror-sync`**, not on the content branch.
 - **`gh workflow run`** looks up the workflow in GitHub's **Actions registry**, which GitHub
-  builds **asynchronously** after the first tooling-branch push. Until registered, the API
-  returns 404 even though the file is already on the repo.
+  builds **asynchronously** after push. Until registered, the API returns 404 even though the
+  file is already on the repo.
 
 ### What does not fix it
 
-- **Pushing the content branch first** is not required. The first successful **`mirror-sync`**
-  run fills that branch. Pushing it alone does not guarantee registration or dispatch.
+- **Pushing the content branch alone** after tooling is already on origin does not register
+  the workflow. Re-run **`mirror-init --push`** or dispatch manually once indexed.
 
 ### What to do
 

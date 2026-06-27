@@ -8,6 +8,7 @@ import { MIRROR_SYNC_BRANCH } from '../../src/mirror-init/config.ts';
 import {
   applyMirrorSyncTemplate,
   bootstrapMirrorFromUpstreamRoot,
+  pushMirrorContentBranchIfMissing,
   repairSyncBranchLayout
 } from '../../src/mirror-init/mirror.ts';
 import { checkoutDestinationReplayBranch } from '../../src/mirror-merge/repos.ts';
@@ -366,6 +367,53 @@ describe('applyMirrorSyncTemplate', () => {
       });
       expect(skipped).toBe(false);
       expect(runGit(mirrorPath, ['rev-parse', MIRROR_SYNC_BRANCH]).trim()).toBe(syncSha);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('pushMirrorContentBranchIfMissing', () => {
+  const noopLogger: Logger = {
+    write() {},
+    close() {}
+  };
+
+  test('pushes content branch when origin ref is missing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-push-content-'));
+    try {
+      const bare = join(root, 'origin.git');
+      const mirrorPath = join(root, 'mirror');
+      spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8', windowsHide: true });
+      initTestRepo(mirrorPath);
+      writeFileSync(join(mirrorPath, 'root.txt'), 'root\n', 'utf8');
+      runGit(mirrorPath, ['add', 'root.txt']);
+      runGit(mirrorPath, ['commit', '-m', 'root']);
+      runGit(mirrorPath, ['remote', 'add', 'origin', bare]);
+
+      const pushed = pushMirrorContentBranchIfMissing(mirrorPath, 'master', 'test-mirror', noopLogger);
+      expect(pushed).toBe(true);
+      expect(runGit(mirrorPath, ['ls-remote', '--heads', 'origin', 'master']).trim()).toMatch(/refs\/heads\/master/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('skips when content branch already on origin', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-push-content-skip-'));
+    try {
+      const bare = join(root, 'origin.git');
+      const mirrorPath = join(root, 'mirror');
+      spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8', windowsHide: true });
+      initTestRepo(mirrorPath);
+      writeFileSync(join(mirrorPath, 'root.txt'), 'root\n', 'utf8');
+      runGit(mirrorPath, ['add', 'root.txt']);
+      runGit(mirrorPath, ['commit', '-m', 'root']);
+      runGit(mirrorPath, ['remote', 'add', 'origin', bare]);
+      runGit(mirrorPath, ['push', '-u', 'origin', 'master']);
+
+      const pushed = pushMirrorContentBranchIfMissing(mirrorPath, 'master', 'test-mirror', noopLogger);
+      expect(pushed).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

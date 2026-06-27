@@ -115,6 +115,25 @@ export function repairToolingBranchLayout(input: {
   return true;
 }
 
+export function pushDefaultBranchIfMissing(input: {
+  RepoPath: string;
+  DefaultBranch: string;
+  Label: string;
+  Logger: Logger;
+}): boolean {
+  fetchOriginBranchOptional(input.RepoPath, input.DefaultBranch, input.Logger);
+  const originDefault = `origin/${input.DefaultBranch}`;
+  if (refExists(input.RepoPath, originDefault)) {
+    return false;
+  }
+  if (!refExists(input.RepoPath, input.DefaultBranch)) {
+    return false;
+  }
+  runGit(input.RepoPath, ['push', '-u', 'origin', input.DefaultBranch], {}, 5, input.Logger);
+  input.Logger.write(`Pushed ${input.DefaultBranch} to origin for ${input.Label}`);
+  return true;
+}
+
 export function pushToolingBranch(input: {
   RepoPath: string;
   ToolingBranch: string;

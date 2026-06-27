@@ -12,6 +12,7 @@ import {
   ensureOriginWorkingCopy,
   ensureToolingBranchCheckout,
   prepareDefaultBranchGraph,
+  pushDefaultBranchIfMissing,
   pushToolingBranch,
   setGitRepoUtf8Encoding
 } from './tooling-repo.ts';
@@ -109,8 +110,15 @@ export function pushDestinationToolingBranch(input: {
   RepoPath: string;
   Owner: string;
   DestinationRepo: string;
+  DefaultBranch: string;
   Logger: Logger;
 }): void {
+  pushDefaultBranchIfMissing({
+    RepoPath: input.RepoPath,
+    DefaultBranch: input.DefaultBranch,
+    Label: `${input.Owner}/${input.DestinationRepo}`,
+    Logger: input.Logger
+  });
   pushToolingBranch({
     RepoPath: input.RepoPath,
     ToolingBranch: MIRROR_MERGE_BRANCH,

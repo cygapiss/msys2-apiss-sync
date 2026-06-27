@@ -14,6 +14,7 @@ import {
 import {
   initializeNamedMirrorRepository,
   mirrorOriginHasContent,
+  pushMirrorContentBranchIfMissing,
   pushMirrorSyncBranch
 } from './mirror.ts';
 import {
@@ -55,6 +56,7 @@ function pushDestinationRepo(input: {
     RepoPath: input.RepoPath,
     Owner: input.Owner,
     DestinationRepo: input.DestinationRepo,
+    DefaultBranch: input.DefaultBranch,
     Logger: input.Logger
   });
   ghDispatchMirrorBlock(MIRROR_MERGE_BLOCK, input.Owner, input.DestinationRepo, input.DefaultBranch, input.Logger);
@@ -79,6 +81,12 @@ function pushMirrorRepo(input: {
       Logger: input.Logger
     });
   }
+  pushMirrorContentBranchIfMissing(
+    input.MirrorPath,
+    input.ContentBranch,
+    input.RepoName,
+    input.Logger
+  );
   pushMirrorSyncBranch(input.MirrorPath, input.RepoName, input.Logger);
   ghDispatchMirrorBlock(MIRROR_SYNC_BLOCK, input.Owner, input.RepoName, input.ContentBranch, input.Logger);
 }
