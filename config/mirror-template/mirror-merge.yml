@@ -6,7 +6,7 @@ name: Mirror merge
 #   (from config/mirror-template/mirror-merge.yml in msys2-apiss-sync; applied by yarn mirror-init)
 #
 # Replay branches (upstream, upstream-ports, upstream-ports-mingw) stay workflow-free.
-# Block 4 CLI bundle: .github/toolings/ (installed by yarn mirror-init on this branch).
+# Block 4 CLI: mirror-merge.mjs and config downloaded at runtime from msys2-apiss-sync.
 #
 # Triggers (Block 2 -> Block 3 and Block 3 -> Block 4 both use workflow_dispatch API):
 #   Block 3 -> Block 4: gh workflow run mirror-merge.yml on ref msys2-apiss-mirror-merge
@@ -66,16 +66,20 @@ jobs:
           git config --global i18n.logOutputEncoding utf-8
           git config --global i18n.commitEncoding utf-8
 
+      - name: Download mirror-merge CLI
+        run: |
+          set -euo pipefail
+          mkdir -p .github/toolings/config
+          curl -fsSL -o .github/toolings/mirror-merge.mjs \
+            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-template/toolings/mirror-merge.mjs"
+          curl -fsSL -o .github/toolings/config/mirror-merge.json \
+            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-merge.json"
+
       - name: Run mirror merge
         run: |
           set -euo pipefail
-          CLI=".github/toolings/src/mirror-merge/cli.ts"
-          if [ ! -f "${CLI}" ]; then
-            echo "Missing ${CLI}; run yarn mirror-init on the tooling repo"
-            exit 1
-          fi
           args=(--destination-path "$GITHUB_WORKSPACE" --push)
           if [ "${{ inputs.clean }}" = "true" ]; then
             args+=(--clean)
           fi
-          node "${CLI}" "${args[@]}"
+          node .github/toolings/mirror-merge.mjs "${args[@]}"

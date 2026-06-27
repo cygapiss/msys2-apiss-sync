@@ -23,7 +23,6 @@ import {
   refExists
 } from './layout.ts';
 import { ghRemoteHasBranch, ghRepoClone } from '../git/gh.ts';
-import { applyToolings, MIRROR_SYNC_TOOLINGS_SPEC, toolingsMatch } from './toolings.ts';
 import {
   defaultBranchRef,
   ensureToolingBranchCheckout,
@@ -54,37 +53,28 @@ function normalizeText(content: string): string {
   return content.replace(/\r\n/g, '\n');
 }
 
-function mirrorSyncFilesMatchTemplates(
-  mirrorPath: string,
-  repoRoot: string,
-  repoName: string,
-  toolingsRoot: string
-): boolean {
-  const configPath = getMirrorSyncConfigPath(repoRoot, repoName);
+function mirrorSyncWorkflowMatchesTemplate(mirrorPath: string, repoRoot: string): boolean {
   const workflowPath = getMirrorSyncWorkflowTemplatePath(repoRoot);
-  const mirrorJson = join(mirrorPath, '.github', 'mirror-sync.json');
   const mirrorYml = join(mirrorPath, '.github', 'workflows', 'mirror-sync.yml');
-  if (!existsSync(mirrorJson) || !existsSync(mirrorYml)) {
+  if (!existsSync(mirrorYml)) {
     return false;
   }
-  const jsonEqual =
-    JSON.stringify(JSON.parse(readFileSync(mirrorJson, 'utf8'))) ===
-    JSON.stringify(JSON.parse(readFileSync(configPath, 'utf8')));
-  const ymlEqual =
-    normalizeText(readFileSync(mirrorYml, 'utf8')) === normalizeText(readFileSync(workflowPath, 'utf8'));
-  return jsonEqual && ymlEqual && toolingsMatch(mirrorPath, toolingsRoot, MIRROR_SYNC_TOOLINGS_SPEC);
+  return (
+    normalizeText(readFileSync(mirrorYml, 'utf8')) === normalizeText(readFileSync(workflowPath, 'utf8'))
+  );
 }
 
-function copyMirrorSyncTemplates(mirrorPath: string, repoRoot: string, repoName: string, logger: Logger): void {
-  const configPath = getMirrorSyncConfigPath(repoRoot, repoName);
+function copyMirrorSyncWorkflow(mirrorPath: string, repoRoot: string, repoName: string, logger: Logger): void {
   const workflowPath = getMirrorSyncWorkflowTemplatePath(repoRoot);
   const githubDir = join(mirrorPath, '.github');
   const workflowsDir = join(githubDir, 'workflows');
   mkdirSync(workflowsDir, { recursive: true });
-  copyFileSync(configPath, join(githubDir, 'mirror-sync.json'));
   copyFileSync(workflowPath, join(workflowsDir, 'mirror-sync.yml'));
-  applyToolings(mirrorPath, getSyncRepoRoot(), MIRROR_SYNC_TOOLINGS_SPEC, logger);
-  logger.write(`Applied config/mirror-sync/${repoName}.json to ${mirrorPath}`);
+  const staleJson = join(githubDir, 'mirror-sync.json');
+  if (existsSync(staleJson)) {
+    rmSync(staleJson);
+  }
+  logger.write(`Applied config/mirror-template/mirror-sync.yml to ${mirrorPath} (${repoName})`);
 }
 
 export function mirrorOriginHasContent(
@@ -150,7 +140,6 @@ export function applyMirrorSyncTemplate(input: {
   RepoRoot?: string;
 }): boolean {
   const repoRoot = input.RepoRoot ?? getSyncRepoRoot();
-  const toolingsRoot = getSyncRepoRoot();
   const configPath = getMirrorSyncConfigPath(repoRoot, input.RepoName);
   const workflowPath = getMirrorSyncWorkflowTemplatePath(repoRoot);
 
@@ -168,37 +157,36 @@ export function applyMirrorSyncTemplate(input: {
   fetchOriginBranchOptional(input.MirrorPath, input.ContentBranch, input.Logger);
   const defaultRef = defaultBranchRef(input.MirrorPath, input.ContentBranch);
   const layoutValid = isToolingLayoutValid(input.MirrorPath, defaultRef, MIRROR_SYNC_BRANCH);
-  const filesInSync = mirrorSyncFilesMatchTemplates(
-    input.MirrorPath,
-    repoRoot,
-    input.RepoName,
-    toolingsRoot
-  );
-  if (layoutValid && filesInSync) {
+  const workflowInSync = mirrorSyncWorkflowMatchesTemplate(input.MirrorPath, repoRoot);
+  if (layoutValid && workflowInSync) {
     input.Logger.write(`${input.RepoName}: ${MIRROR_SYNC_BRANCH} templates already in sync`);
     return false;
   }
 
   const root = firstCommitOfBranch(input.MirrorPath, defaultRef);
   runGit(input.MirrorPath, ['checkout', '-B', MIRROR_SYNC_BRANCH, root], {}, 5, input.Logger);
-  if (!filesInSync) {
-    copyMirrorSyncTemplates(input.MirrorPath, repoRoot, input.RepoName, input.Logger);
+  if (!workflowInSync) {
+    copyMirrorSyncWorkflow(input.MirrorPath, repoRoot, input.RepoName, input.Logger);
   } else if (refExists(input.MirrorPath, `origin/${MIRROR_SYNC_BRANCH}`)) {
     runGit(
       input.MirrorPath,
-      ['checkout', `origin/${MIRROR_SYNC_BRANCH}`, '--', '.github'],
+      ['checkout', `origin/${MIRROR_SYNC_BRANCH}`, '--', '.github/workflows/mirror-sync.yml'],
       {},
       5,
       input.Logger
     );
+  }
+  const staleJson = join(input.MirrorPath, '.github', 'mirror-sync.json');
+  if (existsSync(staleJson)) {
+    rmSync(staleJson);
   }
   runGit(input.MirrorPath, ['add', '-A', '.github'], {}, 5, input.Logger);
   runGit(input.MirrorPath, ['commit', '-m', MIRROR_SYNC_COMMIT_MESSAGE], {}, 5, input.Logger);
   return true;
 }
 
-function maybeEnsureGithubSshPushUrl(mirrorPath: string, logger: Logger): void {
-  const configPath = join(mirrorPath, '.github', 'mirror-sync.json');
+function maybeEnsureGithubSshPushUrl(mirrorPath: string, repoName: string, logger: Logger): void {
+  const configPath = getMirrorSyncConfigPath(getSyncRepoRoot(), repoName);
   let pushViaSsh = false;
   try {
     pushViaSsh = (JSON.parse(readFileSync(configPath, 'utf8')) as { PushViaSsh?: boolean }).PushViaSsh === true;
@@ -241,7 +229,7 @@ export function pushMirrorSyncBranch(
   repoName: string,
   logger: Logger
 ): boolean {
-  maybeEnsureGithubSshPushUrl(mirrorPath, logger);
+  maybeEnsureGithubSshPushUrl(mirrorPath, repoName, logger);
   return pushToolingBranch({
     RepoPath: mirrorPath,
     ToolingBranch: MIRROR_SYNC_BRANCH,

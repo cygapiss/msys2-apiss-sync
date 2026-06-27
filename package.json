@@ -10,6 +10,7 @@
     "mirror-init": "node src/mirror-init/cli.ts",
     "mirror-poll": "node src/mirror-poll/cli.ts",
     "mirror-merge": "node src/mirror-merge/cli.ts",
+    "pack-toolings": "node scripts/pack-toolings.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

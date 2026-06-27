@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { MirrorSyncConfig } from '../types/mirror-sync-config.ts';
-import { MIRROR_POLL_CONFIG_PATH } from '../types/constants.ts';
+import { MIRROR_POLL_CONFIG_PATH, MIRROR_SYNC_CONFIG_DIR } from '../types/constants.ts';
 
 export interface MirrorPollConfig {
   Owner: string;
@@ -50,7 +50,7 @@ export function getMirrorCloneUrl(owner: string, repoName: string): string {
 }
 
 export function getMirrorSyncConfigPath(repoRoot: string, repoName: string): string {
-  return join(repoRoot, 'config', 'mirror-sync', `${repoName}.json`);
+  return join(repoRoot, MIRROR_SYNC_CONFIG_DIR, `${repoName}.json`);
 }
 
 export function loadMirrorSyncConfigFile(repoRoot: string, repoName: string): MirrorSyncConfig | null {
@@ -65,7 +65,9 @@ export function getMirrorContentBranch(repoRoot: string, repoName: string): stri
   const mirrorConfig = loadMirrorSyncConfigFile(repoRoot, repoName);
   const branch = mirrorConfig?.Branches?.[0]?.Mirror;
   if (!branch) {
-    throw new Error(`config/mirror-sync/${repoName}.json: missing Branches[0].Mirror`);
+    throw new Error(
+      `${MIRROR_SYNC_CONFIG_DIR}/${repoName}.json: missing Branches[0].Mirror`
+    );
   }
   return branch;
 }

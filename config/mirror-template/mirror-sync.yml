@@ -3,13 +3,12 @@ name: Mirror sync from upstream
 # Install on mirror repo branch msys2-apiss-mirror-sync (workflows live here, not on master).
 # Layout: docs/mirror-init.md#tooling-branch-layout
 # Copy this file to: .github/workflows/mirror-sync.yml on that branch
-# Copy a per-repo config to: .github/mirror-sync.json
-#   (from config/mirror-sync/<repo-name>.json in msys2-apiss-sync; applied by yarn mirror-init)
-#
+# Per-repo config: config/mirror-sync/<repo-name>.json in msys2-apiss-sync;
+#   CI downloads it at runtime (see mirrorSyncConfigUrl); not committed on mirror repos.
 # master (or configured mirror branches) holds upstream history only;
 # do not commit workflows to mirrored branches.
 #
-# Block 3 CLI bundle: .github/toolings/ (installed by yarn mirror-init on this branch).
+# Block 3 CLI: mirror-sync.mjs downloaded at runtime from msys2-apiss-sync (see MIRROR_SYNC_BUNDLE_URL).
 #
 # Triggers (Block 2 -> Block 3 and Block 3 -> Block 4 both use workflow_dispatch API):
 #   Block 2 -> Block 3: gh workflow run mirror-sync.yml on ref msys2-apiss-mirror-sync
@@ -46,6 +45,13 @@ jobs:
           # Optional PAT with contents:write on this mirror; falls back to github.token.
           token: ${{ secrets.SYNC_DISPATCH_TOKEN || github.token }}
 
+      - name: Download mirror-sync config
+        run: |
+          set -euo pipefail
+          mkdir -p .github
+          curl -fsSL -o .github/mirror-sync.json \
+            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-sync/${{ github.event.repository.name }}.json"
+
       - name: Read push transport
         id: push
         run: |
@@ -69,16 +75,18 @@ jobs:
         with:
           node-version: '26'
 
+      - name: Download mirror-sync CLI
+        run: |
+          set -euo pipefail
+          mkdir -p .github/toolings
+          curl -fsSL -o .github/toolings/mirror-sync.mjs \
+            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-template/toolings/mirror-sync.mjs"
+
       - name: Run mirror sync
         id: sync
         run: |
           set -euo pipefail
-          CLI=".github/toolings/src/mirror-sync/cli.ts"
-          if [ ! -f "${CLI}" ]; then
-            echo "Missing ${CLI}; run yarn mirror-init on the tooling repo"
-            exit 1
-          fi
-          node "${CLI}" \
+          node .github/toolings/mirror-sync.mjs \
             --repo-path "$GITHUB_WORKSPACE" \
             --event-type "${{ inputs.event_type }}"
 

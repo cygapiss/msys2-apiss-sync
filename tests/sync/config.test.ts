@@ -34,7 +34,9 @@ describe('getMirrorPollRepoNames', () => {
     const repoRoot = getSyncRepoRoot();
     const mirrorPollConfig = loadMirrorPollConfig(repoRoot);
     for (const repoName of getMirrorPollRepoNames(mirrorPollConfig)) {
-      expect(getMirrorSyncConfigPath(repoRoot, repoName)).toMatch(/config[/\\]mirror-sync[/\\]/);
+      expect(getMirrorSyncConfigPath(repoRoot, repoName)).toMatch(
+        /config[/\\]mirror-sync[/\\]/
+      );
     }
   });
 

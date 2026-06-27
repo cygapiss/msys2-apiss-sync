@@ -277,7 +277,7 @@ describe('applyMirrorSyncTemplate', () => {
     close() {}
   };
 
-  test('copies config/mirror-sync JSON into sync commit', () => {
+  test('copies mirror-sync workflow into sync commit', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-apply-mirror-'));
     try {
       const syncRepoRoot = join(root, 'sync-repo');
@@ -312,10 +312,12 @@ describe('applyMirrorSyncTemplate', () => {
         RepoRoot: syncRepoRoot
       });
 
-      expect(runGit(mirrorPath, ['rev-parse', `${MIRROR_SYNC_BRANCH}:.github/mirror-sync.json`]).trim()).toBeTruthy();
       expect(
         runGit(mirrorPath, ['rev-parse', `${MIRROR_SYNC_BRANCH}:.github/workflows/mirror-sync.yml`]).trim()
       ).toBeTruthy();
+      expect(() =>
+        runGit(mirrorPath, ['rev-parse', `${MIRROR_SYNC_BRANCH}:.github/mirror-sync.json`])
+      ).toThrow();
       expect(runGit(mirrorPath, ['rev-parse', `${MIRROR_SYNC_BRANCH}^`]).trim()).toBe(masterRoot);
     } finally {
       rmSync(root, { recursive: true, force: true });

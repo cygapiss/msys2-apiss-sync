@@ -28,22 +28,39 @@ yarn mirror-init --push
 
 Requires `gh auth login` when using `--push`.
 
+Rebuild Block 3/4 CLI bundles after changing `src/mirror-sync`, `src/mirror-merge`, or
+shared `src/git` / `src/types` code:
+
+```bash
+yarn pack-toolings
+```
+
+Output: `config/mirror-template/toolings/mirror-sync.mjs` and `mirror-merge.mjs`.
+
+`yarn mirror-init` copies **`mirror-sync.yml`** / **`mirror-merge.yml`** onto tooling
+branches. Per-mirror JSON under **`config/mirror-sync/`**, Block 4
+**`config/mirror-merge.json`**, and Block 3/4 **`.mjs` bundles are not committed on
+mirror or destination repos**; CI downloads them from raw GitHub URLs on
+`msys2-apiss/msys2-apiss-sync` `main` (see `src/types/constants.ts`).
+
 ## What Block 1 installs
 
 | Target | Branch | Files |
 |--------|--------|-------|
-| Each `msys2-apiss/*` mirror repo | **`msys2-apiss-mirror-sync`** | `.github/workflows/mirror-sync.yml`, `.github/mirror-sync.json`, toolings |
+| Each `msys2-apiss/*` mirror repo | **`msys2-apiss-mirror-sync`** | `.github/workflows/mirror-sync.yml` |
 | Destination repo **`msys2-apiss/msys2-apiss`** | **`msys2-apiss-mirror-merge`** | `.github/workflows/mirror-merge.yml` |
 | Tooling repo `msys2-apiss/msys2-apiss-sync` | `main` | TypeScript, config, templates; Block 2 [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) |
 
-**Content branch** (`master` or `Branches[].Mirror` in `config/mirror-sync/<repo>.json`):
+**Content branch** (`master` or `Branches[].Mirror` in
+`config/mirror-sync/<repo>.json`):
 pure upstream mirror; **no workflow files**. Local working copy: `.work/mirrors/<repo>/`.
 
 Both tooling install branches use [Tooling branch layout](#tooling-branch-layout)
 (Block 1 creates or repairs automatically).
 
 Templates: [`config/mirror-template/mirror-sync.yml`](../config/mirror-template/mirror-sync.yml),
-`config/mirror-sync/<repo>.json`. Block 1 copies into each mirror when they differ.
+`config/mirror-sync/<repo>.json`. Block 1 copies workflow YAML from
+`config/mirror-template/` when it differs.
 
 ## Tooling branch layout
 
@@ -56,7 +73,7 @@ Each install branch (**`msys2-apiss-mirror-sync`**, **`msys2-apiss-mirror-merge`
 
 | Repo | Tooling branch | Default branch | Tooling under `.github/` |
 |------|----------------|----------------|--------------------------|
-| Each `msys2-apiss/*` mirror | **`msys2-apiss-mirror-sync`** | content branch (`master` or config) | `workflows/mirror-sync.yml`, `mirror-sync.json`, `toolings/` |
+| Each `msys2-apiss/*` mirror | **`msys2-apiss-mirror-sync`** | content branch (`master` or config) | `workflows/mirror-sync.yml` |
 | **`msys2-apiss/msys2-apiss`** (destination) | **`msys2-apiss-mirror-merge`** | **`main`** (`Destination.DefaultBranch` in [`config/mirror-poll.json`](../config/mirror-poll.json); GitHub default branch) | `workflows/mirror-merge.yml` only |
 
 Replay branches (`upstream`, `upstream-ports`, `upstream-ports-mingw`) and mirror
@@ -113,7 +130,7 @@ only adds GitHub push and CI triggers at the end.
 | Target | Local path | Tooling branch | Default branch | Tooling files |
 |--------|------------|----------------|----------------|---------------|
 | **`msys2-apiss/msys2-apiss`** (destination) | `.work/mirror-merge-ci/` | **`msys2-apiss-mirror-merge`** | **`main`** (`Destination.DefaultBranch`) | `workflows/mirror-merge.yml` |
-| Each `msys2-apiss/*` mirror | `.work/mirrors/<repo>/` | **`msys2-apiss-mirror-sync`** | content branch (`master` or config) | `workflows/mirror-sync.yml`, `mirror-sync.json`, `toolings/` |
+| Each `msys2-apiss/*` mirror | `.work/mirrors/<repo>/` | **`msys2-apiss-mirror-sync`** | content branch (`master` or config) | `workflows/mirror-sync.yml` |
 
 Destination and mirrors share the same [Tooling branch layout](#tooling-branch-layout)
 (fetch default-branch graph, checkout root, apply templates, single tooling commit).
