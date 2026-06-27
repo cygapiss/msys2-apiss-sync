@@ -1,0 +1,12 @@
+{
+  "UpstreamUrl": "https://git.busybox.net/busybox",
+  "Url": "https://busybox.net/about.html",
+  "Description": "BusyBox: The Swiss Army Knife of Embedded Linux",
+  "PushViaSsh": false,
+  "Branches": [
+    { "Upstream": "master", "Mirror": "master" }
+  ],
+  "Notify": {
+    "Enabled": false
+  }
+}

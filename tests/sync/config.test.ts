@@ -18,6 +18,7 @@ describe('getMirrorPollRepoNames', () => {
       'mingw-w64',
       'glibc',
       'binutils-gdb',
+      'busybox',
       'elfutils',
       'gcc',
       'enscript',
