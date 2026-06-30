@@ -59,6 +59,8 @@ parameter list and loop body.
 - Delete files, or add or remove dependencies or versions.
 - Change CI, env vars, or settings.
 - Add tests, docs, or new files.
+- Run `git reset --hard` or other destructive git commands that wipe work (see
+  "Git working tree safety").
 
 ## Interfaces and contracts
 
@@ -111,6 +113,31 @@ Applies to all text you write or edit: code, comments, docs, chat, commits, PRs.
 - Do not start long builds, installs, or full test suites unless asked, or to
   run a minimal check that verifies your requested change.
 
+## Git working tree safety
+
+Never run `git reset --hard` in agent shells or scripts. It discards uncommitted
+work and can drop branch tips with no recovery path the user expects.
+
+When a clean working tree or index is needed (for example before `git am`):
+
+1. Always use the system-provided `git` executable for Git operations; on
+   Windows, use Windows Git from `ProgramFiles`; if unavailable, stop and ask
+   the user to install it.
+2. Inspect scope first: `git status --porcelain`.
+3. Stash instead of reset:
+   - Few files: `git stash push -m "<reason>" -- <paths...>`
+   - Many paths: `git stash push -m "<reason>"` (whole tree)
+4. If more than **20** paths would be stashed, stop and ask the user how to
+   proceed (stash all, stash a subset, commit first, or abort).
+5. After the operation, restore with `git stash pop` (or `git stash apply` when
+   pop risk is high) and confirm `git status`.
+
+Do not use `git reset --hard` even to undo a failed test or clean up after a
+mistake. Prefer `git stash`, targeted `git restore`, or ask the user.
+
+Only use destructive git recovery (`reset --hard`, `clean -fdx`, etc.) when the
+user explicitly requests it in the current message.
+
 ## Commits and pull requests (only when asked)
 
 - Stage only files that belong to the requested change; do not bundle unrelated
@@ -145,4 +172,7 @@ Before sending a reply or creating a commit or PR:
 - Scan `git diff` for line-ending churn: every line deleted and re-added with
   the same text (large +N/-N with no real content change). If found, restore
   the file's original line endings and re-apply only the intended content edits.
+- When the diff touches TypeScript or JavaScript files (`*.ts`, `*.tsx`,
+  `*.js`, `*.jsx`, `*.mjs`, or `*.cjs`), run `yarn check` and fix any
+  TypeScript errors before sending.
 - If anything fails, fix or restore it before sending.
