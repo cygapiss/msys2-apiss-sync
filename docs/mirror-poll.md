@@ -30,8 +30,9 @@ For each repo in `config/mirror-poll.json` `Repos`:
 Upstream tips use GitHub API when `UpstreamUrl` is GitHub; otherwise `git ls-remote`.
 Mirror tips use `gh` on the content branch (not the tooling branch).
 
-Block 3 then fast-forwards the mirror content branch. Package mirrors with
-`Notify.Enabled: true` may dispatch Block 4; mirror-only repos stop after Block 3.
+Block 3 then fast-forwards the mirror content branch ([`mirror-sync.md`](mirror-sync.md)).
+Package mirrors with `Notify.Enabled: true` may dispatch Block 4; mirror-only repos
+stop after Block 3.
 
 ## Triggers
 
@@ -82,12 +83,7 @@ yarn mirror-poll --repo gcc
 [`yarn mirror-init --push --repo <name>`](mirror-init.md), then Block 2 picks up the
 new repo on the next cron or mirror-init end dispatch.
 
-**Manual Block 3** (bypass poll; workflows on tooling branch, not content branch):
-
-```bash
-gh workflow run mirror-sync.yml --repo msys2-apiss/<repo> --ref msys2-apiss-mirror-sync \
-  -f event_type=workflow_dispatch_mirror_sync
-```
+**Manual Block 3:** [`mirror-sync.md`](mirror-sync.md#operator-flows).
 
 **Manual Block 2:**
 
@@ -106,7 +102,8 @@ gh workflow run mirror-poll.yml --repo msys2-apiss/msys2-apiss-sync --ref main
 ## Related
 
 - [`mirror-init.md`](mirror-init.md) -- Block 1 tooling install; `--no-poll`
-- [`plan-workflow.md`](plan-workflow.md) -- Blocks 3-4
+- [`mirror-sync.md`](mirror-sync.md) -- Block 3 fast-forward and notify
+- [`plan-workflow.md`](plan-workflow.md) -- pipeline map
 - [`mirror-merge.md`](mirror-merge.md) -- package replay sources and `Notify.Enabled`
 - [`add-mirror.md`](add-mirror.md) -- register a repo in `Repos`
 - [`usage.md`](usage.md) -- PAT setup and full GitHub operator flow

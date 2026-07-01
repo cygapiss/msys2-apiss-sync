@@ -61,8 +61,8 @@ Both blocks use **`gh workflow run`** on the tooling branch:
 
 | Name | From | To | Workflow |
 |------|------|-----|----------|
-| `workflow_dispatch_mirror_sync` | Block 2 ([`mirror-poll.md`](../docs/mirror-poll.md)) | Block 3 | `mirror-sync.yml` on `msys2-apiss-mirror-sync` |
-| `workflow_dispatch_mirror_merge` | Block 3 (`mirror-sync` notify) | Block 4 | [`mirror-merge.md`](../docs/mirror-merge.md) |
+| `workflow_dispatch_mirror_sync` | Block 2 ([`mirror-poll.md`](../docs/mirror-poll.md)) | Block 3 | [`mirror-sync.md`](../docs/mirror-sync.md) |
+| `workflow_dispatch_mirror_merge` | Block 3 ([`mirror-sync.md`](../docs/mirror-sync.md) notify) | Block 4 | [`mirror-merge.md`](../docs/mirror-merge.md) |
 
 Manual Block 4 runs use the same `workflow_dispatch` API (`gh workflow run mirror-merge.yml ...`).
 
@@ -72,8 +72,8 @@ Set with `gh secret set`; not used by local tooling (`gh auth login` instead).
 
 - `SYNC_DISPATCH_TOKEN`: same PAT on **`msys2-apiss/msys2-apiss-sync`** (Block 2;
   [`mirror-poll.md`](../docs/mirror-poll.md)) and on package mirrors
-  **`MSYS2-packages`**, **`MINGW-packages`** (Block 3 notify:
-  `gh workflow run mirror-merge.yml` on destination when `Notify.Enabled` is true).
+  **`MSYS2-packages`**, **`MINGW-packages`** ([`mirror-sync.md`](../docs/mirror-sync.md)
+  notify: `gh workflow run mirror-merge.yml` on destination when `Notify.Enabled` is true).
 - `MIRROR_PUSH_SSH_KEY`: mirrors with `PushViaSsh` true (e.g. gcc); deploy key
   for `git@github.com` push.
 - Mirror-only repos with `Notify.Enabled` false use `github.token` inside

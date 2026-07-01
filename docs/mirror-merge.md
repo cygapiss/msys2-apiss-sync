@@ -48,7 +48,7 @@ Replay tip branch: `upstream` (`Destination.ReplayTip`). First replayed commit p
 |---------|--------|
 | `yarn mirror-merge` | Local tooling checkout |
 | [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) | CI on `msys2-apiss/msys2-apiss`, ref **`msys2-apiss-mirror-merge`** |
-| Block 3 notify | Package mirrors with `Notify.Enabled: true` dispatch Block 4 after mirror advance |
+| Block 3 notify | [`mirror-sync.md`](mirror-sync.md) -- package mirrors with `Notify.Enabled: true` |
 | `workflow_dispatch` | Manual (`clean=true` for full reset) |
 
 Block 1 [`yarn mirror-init --push`](mirror-init.md) can dispatch Block 4 on the destination
@@ -105,7 +105,7 @@ Merged queue: both sources must be safe at that index. Code: `src/mirror-merge/f
 | `Replay.*` | Age gate, empty-tree skip, line endings |
 
 GitHub Actions secrets are not in this file; Block 3 notify uses `SYNC_DISPATCH_TOKEN`
-on package mirrors ([`usage.md`](usage.md#setup-sync_dispatch_token)).
+([`mirror-sync.md`](mirror-sync.md#ci-secrets), [`usage.md`](usage.md#setup-sync_dispatch_token)).
 
 ## Operator flows
 
@@ -147,7 +147,8 @@ gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss --ref msys2-apis
 
 ## Related
 
-- [`mirror-poll.md`](mirror-poll.md) -- Block 2/3 upstream refresh
+- [`mirror-sync.md`](mirror-sync.md) -- Block 3 upstream refresh before replay
+- [`mirror-poll.md`](mirror-poll.md) -- Block 2 tip compare
 - [`mirror-init.md`](mirror-init.md) -- installs `mirror-merge.yml` tooling branch
 - [`apply-patches-usage.md`](apply-patches-usage.md) -- apply mapped commits locally
 - [`PLAN.md`](PLAN.md) -- replay phases, module layout, acceptance tests

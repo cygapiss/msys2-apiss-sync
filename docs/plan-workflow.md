@@ -9,7 +9,7 @@ repos, blocks, CI boundaries, or operator flows.
 |-------|------|----------------|
 | **1** | mirror-init | `yarn mirror-init` (`fetch-mirrors`) |
 | **2** | mirror-poll | [`mirror-poll.md`](mirror-poll.md) |
-| **3** | mirror-sync | `mirror-sync.yml` on mirror branch **`msys2-apiss-mirror-sync`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)) |
+| **3** | mirror-sync | [`mirror-sync.md`](mirror-sync.md) |
 | **4** | mirror-merge | [`mirror-merge.md`](mirror-merge.md) |
 
 ---
@@ -20,7 +20,7 @@ repos, blocks, CI boundaries, or operator flows.
 |------|------------|
 | Block 1: mirror-init | [`mirror-init.md`](mirror-init.md) ([Tooling branch layout](mirror-init.md#tooling-branch-layout)) |
 | Block 2: mirror-poll | [`mirror-poll.md`](mirror-poll.md) |
-| Block 3: mirror-sync | This file ([Block 3](#block-3-mirror-sync) below) |
+| Block 3: mirror-sync | [`mirror-sync.md`](mirror-sync.md) |
 | Block 4: mirror-merge | [`mirror-merge.md`](mirror-merge.md); algorithm in [`PLAN.md`](PLAN.md) |
 | Operator commands and local testing | [`usage.md`](usage.md), [`run-local.md`](run-local.md) |
 
@@ -34,7 +34,7 @@ repos, blocks, CI boundaries, or operator flows.
 | External upstream | `UpstreamUrl` in `config/mirror-sync/*.json` only; not a workflow actor |
 | Block 1 init | From **msys2-apiss/msys2-apiss-sync** code/templates: **initialize Block 3** on each `msys2-apiss/*` mirror (branch **`msys2-apiss-mirror-sync`**) and **Block 4 CI** on destination branch **`msys2-apiss-mirror-merge`** on **`msys2-apiss/msys2-apiss`**. Same [Tooling branch layout](mirror-init.md#tooling-branch-layout) for both. Every `yarn mirror-init` run deploys/repairs these (unless digest-pinned); **`--push`** pushes bootstrapped repos and dispatches Block 3/4; end dispatch of Block 2 unless **`--no-poll`** ([`mirror-poll.md`](mirror-poll.md)) |
 | Block 2 poll | Compare tips; trigger Block 3 when behind. See [`mirror-poll.md`](mirror-poll.md) |
-| Block 3 mirror-sync | On each **`msys2-apiss/*` mirror repo**; **only configured mirrors** (e.g. `MSYS2-packages`, `MINGW-packages` with `Notify.Enabled`) dispatch Block 4 CI |
+| Block 3 mirror-sync | [`mirror-sync.md`](mirror-sync.md) -- fast-forward content branch; package mirrors dispatch Block 4 when `Notify.Enabled` |
 | Block 4 mirror-merge | [`mirror-merge.md`](mirror-merge.md) |
 | Git surface | TypeScript wraps `git` subprocesses only |
 
@@ -100,14 +100,10 @@ additionally pushes to **`msys2-apiss/*`** and tooling repo, then dispatches Blo
 
 Block 2 also runs standalone ([`mirror-poll.md`](mirror-poll.md)) without Block 1.
 
-Block 3 dispatches Block 4 **only when configured** in `.github/mirror-sync.json`
-(`Notify.Enabled: true` in `config/mirror-sync/<repo>.json`, e.g. `MSYS2-packages`,
-`MINGW-packages`). Mirror-only repos (`mingw-w64`, `glibc`, etc.) set
-`Notify.Enabled: false` and do not dispatch Block 4.
+Block 3 -> Block 4 notify: [`mirror-sync.md`](mirror-sync.md).
 
-**CI note:** Block 2 cron runs on tooling repo `main`. Block 4 workflow lives on
-destination **`msys2-apiss-mirror-merge`** ([`mirror-merge.md`](mirror-merge.md)).
-Block 3 tooling branch: **`msys2-apiss-mirror-sync`** ([`mirror-init.md`](mirror-init.md)).
+**CI note:** Block 2 cron runs on tooling repo `main`. Block 3/4 tooling branches:
+[`mirror-sync.md`](mirror-sync.md), [`mirror-merge.md`](mirror-merge.md).
 
 ## Operator flows
 
@@ -123,38 +119,10 @@ All flows start from a **local checkout** of `msys2-apiss/msys2-apiss-sync` unle
 
 ---
 
-## Block 3: mirror-sync
-
-Runs on each **`msys2-apiss/*` mirror repo**, mirror branch **`msys2-apiss-mirror-sync`**
-([Tooling branch layout](mirror-init.md#tooling-branch-layout)).
-Block 1 installs the workflow; Block 1 **`--push`** or Block 2 poll triggers it.
-
-Template: [`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml). Code:
-`src/mirror-sync/`.
-
-For each `Branches[]` entry in mirror config:
-
-1. Ensure `upstream` remote = `UpstreamUrl`
-2. `git fetch upstream <UpstreamBranch>`
-3. Compare with `origin/<MirrorBranch>`
-4. If different: fast-forward push to mirror content branch (SSH when `PushViaSsh`)
-5. If `SyncTags`: fetch and push tags
-
-Package mirrors with `Notify.Enabled` dispatch Block 4 ([`mirror-merge.md`](mirror-merge.md)).
-Mirror-only repos use `github.token` when unset.
-
----
-
 ## Mirror list (reference)
 
-Package vs mirror-only notify rules: [`mirror-poll.md`](mirror-poll.md#mirror-list-reference).
-Block 3 detail: [above](#block-3-mirror-sync).
-
-| Mirror | Upstream (config) | Feeds mirror-merge |
-|--------|-------------------|--------------------|
-| `msys2-apiss/MSYS2-packages` | `msys2/MSYS2-packages` | yes (`ports/`) |
-| `msys2-apiss/MINGW-packages` | `msys2/MINGW-packages` | yes (`ports-mingw/`) |
-| Others in `config/mirror-poll.json` `Repos` | per `config/mirror-sync/*.json` | per `Notify.Enabled` |
+See [`mirror-sync.md`](mirror-sync.md#mirror-list-reference) and
+[`mirror-poll.md`](mirror-poll.md#mirror-list-reference).
 
 ---
 

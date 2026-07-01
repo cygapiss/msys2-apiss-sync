@@ -7,12 +7,13 @@ on branches `upstream`, `upstream-ports`, `upstream-ports-mingw`.
 
 Local testing and debugging: [`run-local.md`](run-local.md). Design and flags:
 [`PLAN.md`](PLAN.md). Block 1: [`mirror-init.md`](mirror-init.md). Block 2:
-[`mirror-poll.md`](mirror-poll.md). Block 4: [`mirror-merge.md`](mirror-merge.md).
+[`mirror-poll.md`](mirror-poll.md). Block 3: [`mirror-sync.md`](mirror-sync.md). Block 4:
+[`mirror-merge.md`](mirror-merge.md).
 
 ## GitHub (`gh`)
 
-Block 2: [`mirror-poll.md`](mirror-poll.md). Block 4:
-[`mirror-merge.md`](mirror-merge.md) (`mirror-merge.yml` on **`msys2-apiss-mirror-merge`**;
+Block 2: [`mirror-poll.md`](mirror-poll.md). Block 3: [`mirror-sync.md`](mirror-sync.md).
+Block 4: [`mirror-merge.md`](mirror-merge.md) (`mirror-merge.yml` on **`msys2-apiss-mirror-merge`**;
 installed by [`mirror-init`](mirror-init.md)).
 
 Requires the [GitHub CLI](https://cli.github.com/) (`gh auth login`) with access to
@@ -27,7 +28,7 @@ One PAT is reused in three places:
 | Where | Block | Purpose |
 |-------|-------|---------|
 | `msys2-apiss/msys2-apiss-sync` | Block 2 | [`mirror-poll.md`](mirror-poll.md) (`GH_TOKEN` dispatches Block 3) |
-| `msys2-apiss/MSYS2-packages`, `MINGW-packages` | Block 3 | Notify step dispatches Block 4 ([`mirror-merge.md`](mirror-merge.md)) |
+| `msys2-apiss/MSYS2-packages`, `MINGW-packages` | Block 3 | [`mirror-sync.md`](mirror-sync.md) notify step dispatches Block 4 |
 
 Package mirrors **`MSYS2-packages`** and **`MINGW-packages`** need the secret on
 the mirror repo (`Notify.Enabled: true`). The tooling repo needs the same PAT
@@ -49,13 +50,13 @@ gh secret set SYNC_DISPATCH_TOKEN --repo msys2-apiss/msys2-apiss-sync
 ```
 
 Mirror-only repos (`aports`, `glibc`, `gcc`, etc.) do not need this secret;
-mirror-sync uses `github.token` for checkout and push when the secret is unset.
+[`mirror-sync`](mirror-sync.md) uses `github.token` for checkout and push when the secret
+is unset.
 
 ### Setup `MIRROR_PUSH_SSH_KEY` (SSH push, large mirrors)
 
-When `PushViaSsh` is true in `config/mirror-sync/<repo>.json` (only gcc today),
-mirror-sync pushes via `git@github.com:` instead of HTTPS. This avoids
-HTTP/2 disconnects on large initial syncs (e.g. gcc).
+When `PushViaSsh` is true in `config/mirror-sync/<repo>.json` (e.g. gcc). See
+[`mirror-sync.md`](mirror-sync.md#ci-secrets) for which repos use SSH push.
 
 1. **Generate a deploy key** (write access) or reuse one org-wide key pair:
 
@@ -86,35 +87,19 @@ SSH is used only for `git push` on repos with `PushViaSsh` true.
 
 ### 1. Refresh mirrors from upstream
 
-See [`mirror-poll.md`](mirror-poll.md) for cron, `yarn mirror-poll`, and manual Block 3
-dispatch. Package mirrors notify Block 4 when `Notify.Enabled` is true; mirror-only
-repos set `Notify.Enabled` to false.
+See [`mirror-poll.md`](mirror-poll.md) and [`mirror-sync.md`](mirror-sync.md) for cron,
+tip compare, watch runs, and manual dispatch.
 
-### 2. Watch mirror runs
-
-```bash
-gh run watch --repo msys2-apiss/MSYS2-packages
-gh run watch --repo msys2-apiss/MINGW-packages
-gh run watch --repo msys2-apiss/mingw-w64
-gh run watch --repo msys2-apiss/glibc
-```
-
-If upstream advanced, package mirror workflows fast-forward mirror `master` and
-dispatch `msys2-apiss-sync` when configured in `.github/mirror-sync.json`.
-Mirror-only repos (`mingw-w64`, `glibc`) only update their GitHub mirror (no
-destination replay). If there were no upstream changes, skip to step 3 only when
-you still need a destination replay.
-
-### 3. Replay destination
+### 2. Replay destination
 
 See [`mirror-merge.md`](mirror-merge.md) for Block 4 CI trigger, watch, and recovery.
 
-### 4. Verify CI run
+### 3. Verify CI run
 
 See [`mirror-merge.md`](mirror-merge.md#operator-flows) and
 [`run-local.md`](run-local.md#verify-replay-manifest) for branch tips and dry-run verify.
 
-### Recovery and special cases
+### 4. Recovery and special cases
 
 See [`mirror-merge.md`](mirror-merge.md#operator-flows) (`--clean`, resume).
 
@@ -137,6 +122,7 @@ yarn fetch-mirrors --skip-fetch --push
 local `msys2-apiss-sync` differs from `origin/msys2-apiss-sync`. Requires push access to `msys2-apiss/*`
 mirror repos.
 
-Tip compare and Block 3 dispatch: [`mirror-poll.md`](mirror-poll.md). Block 1
-[`yarn mirror-init --push`](mirror-init.md) pushes tooling branches and dispatches Block 3
-directly (no tip compare). Block 4 replay: [`mirror-merge.md`](mirror-merge.md).
+Tip compare and Block 3 dispatch: [`mirror-poll.md`](mirror-poll.md),
+[`mirror-sync.md`](mirror-sync.md). Block 1 [`yarn mirror-init --push`](mirror-init.md)
+pushes tooling branches and dispatches Block 3 directly (no tip compare). Block 4 replay:
+[`mirror-merge.md`](mirror-merge.md).

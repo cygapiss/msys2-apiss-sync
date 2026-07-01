@@ -11,10 +11,11 @@ This repo implements two pipelines. Each has its own plan document:
 | [**Mirror-merge**](mirror-merge.md) | [msys2-apiss/msys2-apiss](https://github.com/msys2-apiss/msys2-apiss) destination | `yarn mirror-merge`; [`mirror-merge.yml` CI](mirror-merge.md) |
 | [**Mirror-init**](mirror-init.md#tooling-branch-layout) | Block 1: [Tooling branch layout](mirror-init.md#tooling-branch-layout), `--push` | `yarn mirror-init` |
 | [**Mirror-poll**](mirror-poll.md) | Block 2: tip compare, cron, `config/mirror-poll.json` | `yarn mirror-poll` |
+| [**Mirror-sync**](mirror-sync.md) | Block 3: fast-forward mirror content branch, notify Block 4 | CI on mirror repos ([`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml)) |
 
 End-to-end flow: Block 0 (config URL) -> **Block 1** init -> **Block 2** poll
 ([`mirror-poll.md`](mirror-poll.md)) or Block 1 **`--push`** (dispatch Block 3) ->
-**Block 3** mirror-sync -> **Block 4** mirror-merge ([`mirror-merge.md`](mirror-merge.md);
+**Block 3** [`mirror-sync`](mirror-sync.md) -> **Block 4** mirror-merge ([`mirror-merge.md`](mirror-merge.md);
 replay + push to `msys2-apiss/msys2-apiss` `upstream*`).
 
 The sections below are the **shared foundation** (runtime, replay algorithm, phases 1a-1d).

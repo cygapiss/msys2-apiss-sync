@@ -97,37 +97,18 @@ unless `--no-poll` ([`mirror-poll.md`](mirror-poll.md)).
 - **Destination:** push `main` if missing; push **`msys2-apiss-mirror-merge`**; dispatch
   Block 4 ([`mirror-merge.md`](mirror-merge.md)).
 - **Mirror:** `gh repo create` if empty origin; push content branch if missing; push
-  **`msys2-apiss-mirror-sync`**; dispatch Block 3 on that ref (skip only if a run is
-  in progress). May temporarily set default branch to the tooling branch until GitHub
-  registers the workflow.
+  **`msys2-apiss-mirror-sync`**; dispatch Block 3 on that ref ([`mirror-sync.md`](mirror-sync.md);
+  skip only if a run is in progress). May temporarily set default branch to the tooling
+  branch until GitHub registers the workflow.
 
 Working copy: **none** (clone or upstream bootstrap), **broken** (re-init),
 **incomplete** (repair layout), **complete** (reuse; apply when needed). Empty GitHub
 origin uses upstream bootstrap (`UpstreamUrl` in mirror config). `PushViaSsh` mirrors:
 reuse complete clones when possible.
 
-## Dispatch 404 (new mirror)
-
-After first `--push`, `gh workflow run mirror-sync.yml` may return **404** until GitHub
-indexes the workflow on **`msys2-apiss-mirror-sync`**. Pushing the content branch alone
-does not fix this. Wait a few minutes and re-run:
-
-```bash
-yarn mirror-init --push --repo <name> --skip-fetch
-```
-
-Or dispatch manually once indexed:
-
-```bash
-gh workflow run mirror-sync.yml --repo msys2-apiss/<repo> --ref msys2-apiss-mirror-sync \
-  -f event_type=workflow_dispatch_mirror_sync
-```
-
-Check: `gh api repos/msys2-apiss/<repo>/actions/workflows -q ".total_count"` returns `1`
-when ready.
-
 ## Related
 
+- [`mirror-sync.md`](mirror-sync.md) -- Block 3 fast-forward and dispatch 404 troubleshooting
 - [`mirror-poll.md`](mirror-poll.md) -- Block 2 tip compare and dispatch
 - [`mirror-merge.md`](mirror-merge.md) -- Block 4 replay
 - [`plan-workflow.md`](plan-workflow.md) -- pipeline map

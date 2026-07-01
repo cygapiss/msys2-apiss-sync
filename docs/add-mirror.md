@@ -121,7 +121,7 @@ lives in `config/mirror-sync/<repo-name>.json` only.
 ### 2. Bootstrap on GitHub
 
 Run (creates the GitHub repo with `gh` when missing, pushes **`msys2-apiss-mirror-sync`**,
-dispatches mirror-sync; Block 3 pushes the content branch):
+dispatches mirror-sync; Block 3 pushes the content branch ([`mirror-sync.md`](mirror-sync.md)):
 
 ```bash
 yarn mirror-init --repo my-tool --push
@@ -129,8 +129,8 @@ yarn mirror-init --repo my-tool --push
 
 This fetches upstream commit graph blob:none, checks out the root commit only
 locally ([Tooling branch layout](mirror-init.md#tooling-branch-layout)), pushes
-**`msys2-apiss-mirror-sync`**, triggers `mirror-sync` on GitHub (Block 3 fetches
-upstream and pushes the content branch), then restores default branch when needed.
+**`msys2-apiss-mirror-sync`**, triggers `mirror-sync` on GitHub ([`mirror-sync.md`](mirror-sync.md);
+Block 3 fetches upstream and pushes the content branch), then restores default branch when needed.
 
 Later, `yarn fetch-mirrors` clones into `.work/mirrors/my-tool/` on branch
 **`msys2-apiss-sync`** and applies `config/mirror-sync/my-tool.json` when templates differ.
@@ -144,8 +144,9 @@ yarn fetch-mirrors --skip-fetch --push
 On first bootstrap, `--push` temporarily sets default branch to `msys2-apiss-sync` so
 GitHub registers `mirror-sync.yml`, triggers mirror-sync, then immediately sets
 default back to the content branch (`master` or configured mirror branch). It
-does not wait for the run to finish. Later **`--push`** dispatches Block 3 on ref **`msys2-apiss-mirror-sync`**, then Block 2
-unless **`--no-poll`** ([`mirror-poll.md`](mirror-poll.md)).
+does not wait for the run to finish. Later **`--push`** dispatches Block 3 on ref **`msys2-apiss-mirror-sync`**
+([`mirror-sync.md`](mirror-sync.md)), then Block 2 unless **`--no-poll`**
+([`mirror-poll.md`](mirror-poll.md)).
 
 Or manually:
 
