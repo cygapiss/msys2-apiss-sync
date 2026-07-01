@@ -55,17 +55,20 @@ Re-run `yarn mirror-init` after local tooling edits or when templates differ.
 
 ## Digest pins
 
-Optional **`config/digest.json`**: repo name -> SHA256 of installed tooling inputs.
-Updated only by **`yarn mirror-init --push`** after a successful bootstrap for that repo.
-Plain `yarn mirror-init` (no `--push`) never writes this file.
+Optional **`config/digest.json`**: repo name -> SHA256 of the workflow YAML installed
+on that repo's tooling branch. Updated only by **`yarn mirror-init --push`** after a
+successful bootstrap for that repo. Plain `yarn mirror-init` (no `--push`) never writes
+this file.
 
-Per-repo hash includes:
+| Repo kind | Hashed file (only) |
+|-----------|-------------------|
+| Mirror | `config/mirror-template/mirror-sync.yml` |
+| Destination | `config/mirror-template/mirror-merge.yml` |
 
-| Shared (all repos) | Per mirror | Per destination |
-|--------------------|------------|-----------------|
-| `config/mirror-template/toolings/*` | `mirror-sync.yml`, `config/mirror-sync/<repo>.json` | `mirror-merge.yml`, `config/mirror-merge.json` |
+Bundles (`config/mirror-template/toolings/*`), `config/mirror-merge.json`, and
+`config/mirror-sync/<repo>.json` are downloaded at CI runtime; they are not hashed.
 
-Not hashed: `config/digest.json`, `config/mirror-poll.json`, other mirrors' JSON.
+Not hashed: `config/digest.json`, `config/mirror-poll.json`.
 
 | Digest state | Behavior |
 |--------------|----------|
@@ -73,13 +76,12 @@ Not hashed: `config/digest.json`, `config/mirror-poll.json`, other mirrors' JSON
 | Matches current hash | Skip init, push, and mirror-sync/mirror-merge dispatch for that repo |
 | All pinned | Skip all repo work; mirror-poll still runs unless `--no-poll` |
 
-Shared template or bundle change re-bootstrap **all** repos on next `--push`. One
-mirror JSON change re-bootstraps **that mirror only** (`--repo <name>`).
+A change to `mirror-sync.yml` re-bootstraps **all mirror repos** on next `--push`.
+A change to `mirror-merge.yml` re-bootstraps the **destination** only.
 
 ```bash
-yarn pack-toolings              # after TS changes to bundles
-yarn mirror-init --push         # shared template/bundle change
-yarn mirror-init --push --repo elfutils   # one mirror JSON change
+yarn mirror-init --push              # after mirror-sync.yml change
+yarn mirror-init --push              # after mirror-merge.yml change (destination)
 # commit config/digest.json when pins were updated
 ```
 

@@ -110,8 +110,7 @@ Applies to all text you write or edit: code, comments, docs, chat, commits, PRs.
   base content; do not "fix" it by normalizing punctuation.
 - Do not reflow or wrap untouched lines. Wrap only a line you functionally edit,
   and only when it aids correctness or local readability, or when asked.
-- All plan documents must use UTF-8 encoding by default (no BOM preferred),
-  including new `*plan*.md` files.
+- All docs under `docs/` must use UTF-8 encoding by default (no BOM preferred).
 
 ## Planning and execution
 

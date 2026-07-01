@@ -19,7 +19,7 @@ MSYS2 package history into `msys2-apiss/msys2-apiss`.
 - **Destination**: `msys2-apiss/msys2-apiss`, branch `upstream`
 - **Base commit**: `6fc20894663468a04dd4986a8b1c15a9d5ae8649` (parent of first replayed commit)
 - **Strategy**: deterministic date-ordered replay; same SHAs on every rebuild at same pins
-- **Triggers**: mirror-poll (~hourly cron, push to `main`); mirror-sync -> mirror-merge `workflow_dispatch` after mirrors advance. Plan ~1 h latency.
+- **Triggers**: mirror-poll (~hourly cron, push to `main`); mirror-sync -> mirror-merge `workflow_dispatch` after mirrors advance. Expect ~1 h end-to-end latency.
 - **Runtime**: Node.js 26+; TypeScript runs directly with Node type stripping
 - **State**: destination branches (`upstream`, `upstream-ports`, `upstream-ports-mingw`) hold replay progress and resume cursors; no checkpoint file
 - **Tooling branches**: mirror-init install branches **`msys2-apiss-mirror-sync`** and **`msys2-apiss-mirror-merge`** follow [Tooling branch layout](docs/mirror-init.md#tooling-branch-layout)
@@ -27,7 +27,7 @@ MSYS2 package history into `msys2-apiss/msys2-apiss`.
 ## Do not
 
 - Ship untestable instructions (dot-source-only recipes); use runnable scripts -- see `.cursor/rules/human-testable.mdc` and [`docs/usage.md`](docs/usage.md)
-- Use Cursor internal plans (`~/.cursor/plans/`) or untracked shadow plan files; edit committed docs in `docs/` (see `.cursor/rules/planning-docs.mdc`)
+- Use Cursor internal plans (`~/.cursor/plans/`) or untracked shadow design files; edit committed docs in `docs/` (see `.cursor/rules/documentation.mdc`)
 - Use `git merge` of entire upstream repos into destination (use replay instead)
 - Add platform-specific APIs in shared sync code
 - Commit PATs or tokens; use GitHub Actions secrets only

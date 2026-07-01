@@ -1,42 +1,14 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { Logger } from '../git/log.ts';
-import {
-  MIRROR_MERGE_CONFIG_PATH,
-  MIRROR_SYNC_CONFIG_DIR,
-  MIRROR_TEMPLATE_DIR,
-  MIRROR_TOOLINGS_TEMPLATE_DIR,
-  TOOLING_DIGEST_PATH
-} from '../types/constants.ts';
+import { MIRROR_TEMPLATE_DIR, TOOLING_DIGEST_PATH } from '../types/constants.ts';
 
 export type RepoToolingKind = 'destination' | 'mirror';
 
 const MIRROR_SYNC_WORKFLOW = `${MIRROR_TEMPLATE_DIR}/mirror-sync.yml`;
 const MIRROR_MERGE_WORKFLOW = `${MIRROR_TEMPLATE_DIR}/mirror-merge.yml`;
-
-function listFilesUnderDir(absDir: string, relPrefix: string): string[] {
-  if (!existsSync(absDir)) {
-    return [];
-  }
-  const files: string[] = [];
-
-  function walk(dir: string, prefix: string): void {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {
-        walk(full, rel);
-      } else if (entry.isFile()) {
-        files.push(`${relPrefix}/${rel}`.replace(/\\/g, '/'));
-      }
-    }
-  }
-
-  walk(absDir, '');
-  return files;
-}
 
 function hashFilePaths(repoRoot: string, paths: string[]): string {
   const sorted = [...paths].sort();
@@ -55,21 +27,11 @@ function hashFilePaths(repoRoot: string, paths: string[]): string {
 
 export function computeRepoToolingDigest(
   repoRoot: string,
-  repo: string,
+  _repo: string,
   kind: RepoToolingKind
 ): string {
-  const paths: string[] = listFilesUnderDir(
-    join(repoRoot, MIRROR_TOOLINGS_TEMPLATE_DIR),
-    MIRROR_TOOLINGS_TEMPLATE_DIR
-  );
-
-  if (kind === 'destination') {
-    paths.push(MIRROR_MERGE_WORKFLOW, MIRROR_MERGE_CONFIG_PATH);
-  } else {
-    paths.push(MIRROR_SYNC_WORKFLOW, `${MIRROR_SYNC_CONFIG_DIR}/${repo}.json`);
-  }
-
-  return hashFilePaths(repoRoot, paths);
+  const workflow = kind === 'destination' ? MIRROR_MERGE_WORKFLOW : MIRROR_SYNC_WORKFLOW;
+  return hashFilePaths(repoRoot, [workflow]);
 }
 
 export function loadDigestMap(repoRoot: string, logger?: Logger): Record<string, string> {

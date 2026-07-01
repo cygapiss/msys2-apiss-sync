@@ -68,7 +68,7 @@ function expectedDigest(root: string, paths: string[]): string {
 }
 
 describe('computeRepoToolingDigest', () => {
-  test('hashes sorted paths with null separator for mirror inputs', () => {
+  test('hashes mirror-sync.yml only for mirror repos', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-digest-'));
     try {
       writeDigestInputs(root, {
@@ -76,29 +76,21 @@ describe('computeRepoToolingDigest', () => {
         toolings: { 'mirror-sync.mjs': 'export {}\n' }
       });
 
-      const paths = [
-        'config/mirror-sync/elfutils.json',
-        'config/mirror-template/mirror-sync.yml',
-        'config/mirror-template/toolings/mirror-sync.mjs'
-      ];
+      const paths = ['config/mirror-template/mirror-sync.yml'];
       expect(computeRepoToolingDigest(root, 'elfutils', 'mirror')).toBe(expectedDigest(root, paths));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  test('hashes destination workflow, merge config, and toolings', () => {
+  test('hashes mirror-merge.yml only for destination', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-digest-dest-'));
     try {
       writeDigestInputs(root, {
         toolings: { 'mirror-merge.mjs': 'export {}\n' }
       });
 
-      const paths = [
-        'config/mirror-merge.json',
-        'config/mirror-template/mirror-merge.yml',
-        'config/mirror-template/toolings/mirror-merge.mjs'
-      ];
+      const paths = ['config/mirror-template/mirror-merge.yml'];
       expect(computeRepoToolingDigest(root, 'msys2-apiss', 'destination')).toBe(
         expectedDigest(root, paths)
       );
@@ -107,7 +99,7 @@ describe('computeRepoToolingDigest', () => {
     }
   });
 
-  test('mirror JSON change affects one repo only', () => {
+  test('same mirror digest for all mirror repo names', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-digest-mirror-only-'));
     try {
       writeDigestInputs(root, {
@@ -117,23 +109,24 @@ describe('computeRepoToolingDigest', () => {
         }
       });
 
-      const digestA = computeRepoToolingDigest(root, 'a', 'mirror');
-      const digestB = computeRepoToolingDigest(root, 'b', 'mirror');
-      expect(digestA).not.toBe(digestB);
+      expect(computeRepoToolingDigest(root, 'a', 'mirror')).toBe(
+        computeRepoToolingDigest(root, 'b', 'mirror')
+      );
 
       writeFileSync(
         join(root, 'config/mirror-sync/b.json'),
         '{"UpstreamUrl":"https://example.com/changed.git"}\n',
         'utf8'
       );
-      expect(computeRepoToolingDigest(root, 'a', 'mirror')).toBe(digestA);
-      expect(computeRepoToolingDigest(root, 'b', 'mirror')).not.toBe(digestB);
+      expect(computeRepoToolingDigest(root, 'a', 'mirror')).toBe(
+        computeRepoToolingDigest(root, 'b', 'mirror')
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  test('shared template or tooling change affects all repos', () => {
+  test('workflow YAML change affects digest; bundles and JSON do not', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-digest-shared-'));
     try {
       writeDigestInputs(root, {
@@ -148,6 +141,8 @@ describe('computeRepoToolingDigest', () => {
         'name: sync-changed\n',
         'utf8'
       );
+      writeFileSync(join(root, 'config/mirror-template/toolings/mirror-sync.mjs'), 'changed\n', 'utf8');
+      writeFileSync(join(root, 'config/mirror-merge.json'), '{"changed":true}\n', 'utf8');
 
       expect(computeRepoToolingDigest(root, 'a', 'mirror')).not.toBe(mirrorBefore);
       expect(computeRepoToolingDigest(root, 'msys2-apiss', 'destination')).toBe(destBefore);
@@ -172,12 +167,12 @@ describe('computeRepoToolingDigest', () => {
     }
   });
 
-  test('throws when required mirror config is missing', () => {
+  test('throws when workflow template is missing', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-digest-missing-'));
     try {
-      writeDigestInputs(root, {});
+      mkdirSync(join(root, 'config/mirror-template'), { recursive: true });
       expect(() => computeRepoToolingDigest(root, 'missing', 'mirror')).toThrow(
-        'Missing digest input file: config/mirror-sync/missing.json'
+        'Missing digest input file: config/mirror-template/mirror-sync.yml'
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
