@@ -278,7 +278,7 @@ describe('applyMirrorSyncTemplate', () => {
   };
 
   test('copies mirror-sync workflow into sync commit', () => {
-    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-apply-mirror-'));
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-mirror-template-'));
     try {
       const syncRepoRoot = join(root, 'sync-repo');
       const mirrorPath = join(root, 'mirror');

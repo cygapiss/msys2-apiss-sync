@@ -150,5 +150,4 @@ gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss --ref msys2-apis
 - [`mirror-sync.md`](mirror-sync.md) -- Block 3 upstream refresh before replay
 - [`mirror-poll.md`](mirror-poll.md) -- Block 2 tip compare
 - [`mirror-init.md`](mirror-init.md) -- installs `mirror-merge.yml` tooling branch
-- [`apply-patches-usage.md`](apply-patches-usage.md) -- apply mapped commits locally
 - [`PLAN.md`](PLAN.md) -- replay phases, module layout, acceptance tests

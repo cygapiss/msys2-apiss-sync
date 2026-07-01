@@ -222,7 +222,5 @@ git -C .work/mirrors/my-tool rev-parse origin/master
 ## Related
 
 - [`mirror-init.md` -- Tooling branch layout](mirror-init.md#tooling-branch-layout)
-- [`apply-patches-usage.md`](apply-patches-usage.md) -- apply mapped commits from
-  package mirrors into a destination branch
 - [`config/mirror-template/mirror-sync.yml`](../config/mirror-template/mirror-sync.yml) -- shared
   workflow installed on each mirror **`msys2-apiss-mirror-sync`** branch
