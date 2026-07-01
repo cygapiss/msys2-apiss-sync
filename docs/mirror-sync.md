@@ -1,7 +1,7 @@
-# mirror-sync (Block 3)
+# mirror-sync
 
-Block 3 fast-forwards each mirror's **content branch** from upstream and optionally
-dispatches Block 4. Pipeline: [`usage.md`](usage.md). Code:
+mirror-sync fast-forwards each mirror's **content branch** from upstream and optionally
+dispatches mirror-merge. Pipeline: [`README.md`](README.md). Code:
 `src/mirror-sync/`. CI bundle: `config/mirror-template/toolings/mirror-sync.mjs`
 (`yarn pack-toolings`). Workflow template:
 [`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml) on branch
@@ -26,9 +26,9 @@ Content branches (`master` or configured `Mirror`) hold pure upstream history wi
 
 | Outcome | Next step |
 |---------|-----------|
-| Tips already match | No push; Block 4 not notified |
+| Tips already match | No push; mirror-merge not notified |
 | Content branch advanced, `Notify.Enabled: false` | Mirror updated only |
-| Content branch advanced, `Notify.Enabled: true` | Dispatch Block 4 ([`mirror-merge.md`](mirror-merge.md)) |
+| Content branch advanced, `Notify.Enabled: true` | Dispatch mirror-merge ([`mirror-merge.md`](mirror-merge.md)) |
 
 Package mirrors (`MSYS2-packages`, `MINGW-packages`) use `Notify.Enabled: true`.
 Mirror-only repos set `Notify.Enabled: false`.
@@ -37,11 +37,11 @@ Mirror-only repos set `Notify.Enabled: false`.
 
 | Trigger | Where |
 |---------|--------|
-| Block 2 poll | [`mirror-poll.md`](mirror-poll.md) dispatches `workflow_dispatch_mirror_sync` |
-| Block 1 `--push` | [`mirror-init.md`](mirror-init.md) dispatches after tooling push |
+| mirror-poll | [`mirror-poll.md`](mirror-poll.md) dispatches `workflow_dispatch_mirror_sync` |
+| mirror-init `--push` | [`mirror-init.md`](mirror-init.md) dispatches after tooling push |
 | `workflow_dispatch` | Manual on ref **`msys2-apiss-mirror-sync`** |
 
-Input event type: `workflow_dispatch_mirror_sync`. Block 3 -> Block 4 uses
+Input event type: `workflow_dispatch_mirror_sync`. mirror-sync -> mirror-merge uses
 `workflow_dispatch_mirror_merge` on package mirrors only.
 
 ## Config
@@ -53,11 +53,11 @@ downloads at runtime -- not committed on mirror repos).
 |-----|---------|
 | `UpstreamUrl` | External upstream git URL |
 | `Branches[]` | `Upstream` branch to fetch; `Mirror` content branch to push |
-| `Notify.Enabled` | When true, dispatch Block 4 after advance |
+| `Notify.Enabled` | When true, dispatch mirror-merge after advance |
 | `Notify.Repository` | Destination repo (default `msys2-apiss/msys2-apiss`) |
 | `PushViaSsh` | Use SSH push (large mirrors, e.g. gcc) |
 | `SyncTags` | Mirror tags when true |
-| `Description`, `Url` | Optional; Block 1 `gh repo create` metadata |
+| `Description`, `Url` | Optional; mirror-init `gh repo create` metadata |
 
 Register new mirrors: [`add-mirror.md`](add-mirror.md). Repo must appear in
 `config/mirror-poll.json` `Repos`.
@@ -66,7 +66,7 @@ Register new mirrors: [`add-mirror.md`](add-mirror.md). Repo must appear in
 
 | Secret | Where | Purpose |
 |--------|-------|---------|
-| `SYNC_DISPATCH_TOKEN` | Package mirror repos with `Notify.Enabled: true` | Block 3 notify step runs `gh workflow run mirror-merge.yml` |
+| `SYNC_DISPATCH_TOKEN` | Package mirror repos with `Notify.Enabled: true` | mirror-sync notify step runs `gh workflow run mirror-merge.yml` |
 | `MIRROR_PUSH_SSH_KEY` | Mirrors with `PushViaSsh: true` | SSH deploy key for `git push` |
 
 Mirror-only repos use `github.token` for checkout and push when `SYNC_DISPATCH_TOKEN`
@@ -76,11 +76,11 @@ is unset. PAT setup: [`usage.md`](usage.md#setup-sync_dispatch_token).
 set `MIRROR_PUSH_SSH_KEY` (secret alone is not enough). See
 [`usage.md`](usage.md#setup-mirror_push_ssh_key).
 
-Block 2 uses the same PAT on the tooling repo to dispatch Block 3.
+mirror-poll uses the same PAT on the tooling repo to dispatch mirror-sync.
 
 ## Operator flows
 
-**Routine (CI):** Block 2 cron -> Block 3 when upstream ahead -> Block 4 when
+**Routine (CI):** mirror-poll cron -> mirror-sync when upstream ahead -> mirror-merge when
 `Notify.Enabled`.
 
 **Watch a run:**
@@ -110,16 +110,16 @@ returns `1` when ready.
 
 ## Mirror list (reference)
 
-| Mirror | Upstream (config) | Block 4 replay |
-|--------|-------------------|----------------|
+| Mirror | Upstream (config) | mirror-merge replay |
+|--------|-------------------|---------------------|
 | `MSYS2-packages` | `msys2/MSYS2-packages` | yes (`ports/`) |
 | `MINGW-packages` | `msys2/MINGW-packages` | yes (`ports-mingw/`) |
 | Others in `mirror-poll.json` `Repos` | per `config/mirror-sync/*.json` | per `Notify.Enabled` |
 
 ## Related
 
-- [`mirror-poll.md`](mirror-poll.md) -- Block 2 triggers Block 3
+- [`mirror-poll.md`](mirror-poll.md) -- triggers mirror-sync
 - [`mirror-init.md`](mirror-init.md) -- installs workflow YAML on tooling branch
-- [`mirror-merge.md`](mirror-merge.md) -- Block 4 after package mirror advance
+- [`mirror-merge.md`](mirror-merge.md) -- after package mirror advance
 - [`add-mirror.md`](add-mirror.md) -- add `config/mirror-sync/<repo>.json`
 - [`usage.md`](usage.md) -- GitHub operator flow and secrets

@@ -18,11 +18,11 @@ import {
   pushMirrorSyncBranch
 } from './mirror.ts';
 import {
-  ghDispatchMirrorBlock,
+  ghDispatchMirror,
   ghRepoCreate,
-  MIRROR_MERGE_BLOCK,
-  MIRROR_POLL_BLOCK,
-  MIRROR_SYNC_BLOCK,
+  MIRROR_MERGE_DISPATCH,
+  MIRROR_POLL_DISPATCH,
+  MIRROR_SYNC_DISPATCH,
   requireGhAuthenticated
 } from '../git/gh.ts';
 import { runGitText } from '../git/index.ts';
@@ -66,7 +66,7 @@ function pushDestinationRepo(input: {
     DefaultBranch: input.DefaultBranch,
     Logger: input.Logger
   });
-  ghDispatchMirrorBlock(MIRROR_MERGE_BLOCK, input.Owner, input.DestinationRepo, input.DefaultBranch, input.Logger);
+  ghDispatchMirror(MIRROR_MERGE_DISPATCH, input.Owner, input.DestinationRepo, input.DefaultBranch, input.Logger);
 }
 
 function pushMirrorRepo(input: {
@@ -95,7 +95,7 @@ function pushMirrorRepo(input: {
     input.Logger
   );
   pushMirrorSyncBranch(input.MirrorPath, input.RepoName, input.Logger);
-  ghDispatchMirrorBlock(MIRROR_SYNC_BLOCK, input.Owner, input.RepoName, input.ContentBranch, input.Logger);
+  ghDispatchMirror(MIRROR_SYNC_DISPATCH, input.Owner, input.RepoName, input.ContentBranch, input.Logger);
 }
 
 export async function runMirrorInit(input: {
@@ -215,8 +215,8 @@ export async function runMirrorInit(input: {
     logger.write('updated config/digest.json');
   }
   if (!input.NoPoll) {
-    ghDispatchMirrorBlock(
-      MIRROR_POLL_BLOCK,
+    ghDispatchMirror(
+      MIRROR_POLL_DISPATCH,
       owner,
       TOOLING_REPO,
       TOOLING_DEFAULT_BRANCH,

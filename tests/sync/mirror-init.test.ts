@@ -14,12 +14,12 @@ vi.mock('../../src/mirror-init/config.ts', async (importOriginal) => {
   };
 });
 
-const ghDispatchMirrorBlock = vi.fn();
+const ghDispatchMirror = vi.fn();
 const requireGhAuthenticated = vi.fn();
 
 vi.mock('../../src/git/gh.ts', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../src/git/gh.ts')>();
-  return { ...mod, ghDispatchMirrorBlock, requireGhAuthenticated };
+  return { ...mod, ghDispatchMirror, requireGhAuthenticated };
 });
 
 const initializeDestinationRepository = vi.fn(() => join(repoRoot, '.work', 'mirror-merge-ci'));
@@ -60,7 +60,7 @@ describe('runMirrorInit digest fast path', () => {
     repoRoot = mkdtempSync(join(tmpdir(), 'mirror-init-fast-'));
     initializeDestinationRepository.mockClear();
     initializeNamedMirrorRepository.mockClear();
-    ghDispatchMirrorBlock.mockClear();
+    ghDispatchMirror.mockClear();
     requireGhAuthenticated.mockClear();
   });
 
@@ -84,14 +84,14 @@ describe('runMirrorInit digest fast path', () => {
 
     expect(initializeDestinationRepository).not.toHaveBeenCalled();
     expect(initializeNamedMirrorRepository).not.toHaveBeenCalled();
-    expect(ghDispatchMirrorBlock).not.toHaveBeenCalled();
+    expect(ghDispatchMirror).not.toHaveBeenCalled();
     expect(requireGhAuthenticated).not.toHaveBeenCalled();
   });
 
   test('dispatches mirror-poll when all pinned unless --no-poll', async () => {
     writeConfigTree(repoRoot);
     const { computeRepoToolingDigest } = await import('../../src/lib/tooling-digest.ts');
-    const { MIRROR_POLL_BLOCK } = await import('../../src/git/mirror-block-dispatch.ts');
+    const { MIRROR_POLL_DISPATCH } = await import('../../src/git/mirror-dispatch.ts');
     const destDigest = computeRepoToolingDigest(repoRoot, 'dest', 'destination');
     const mirrorDigest = computeRepoToolingDigest(repoRoot, 'mirror-a', 'mirror');
     writeFileSync(
@@ -106,8 +106,8 @@ describe('runMirrorInit digest fast path', () => {
     expect(initializeDestinationRepository).not.toHaveBeenCalled();
     expect(initializeNamedMirrorRepository).not.toHaveBeenCalled();
     expect(requireGhAuthenticated).toHaveBeenCalled();
-    expect(ghDispatchMirrorBlock).toHaveBeenCalledWith(
-      MIRROR_POLL_BLOCK,
+    expect(ghDispatchMirror).toHaveBeenCalledWith(
+      MIRROR_POLL_DISPATCH,
       'msys2-apiss',
       'msys2-apiss-sync',
       'main',

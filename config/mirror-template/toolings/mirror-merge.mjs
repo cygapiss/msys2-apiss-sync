@@ -43,8 +43,19 @@ function readIntOption(args, name, fallback = 0) {
 }
 //#endregion
 //#region src/types/constants.ts
-/** Block 4 replay config in the tooling repo (local yarn mirror-merge). */
+/** mirror-sync bundled CLI filename (committed in tooling repo; CI downloads by URL). */
+var MIRROR_SYNC_BUNDLE = "mirror-sync.mjs";
+/** mirror-merge bundled CLI filename (committed in tooling repo; CI downloads by URL). */
+var MIRROR_MERGE_BUNDLE = "mirror-merge.mjs";
+/** Prebuilt mirror-sync/mirror-merge bundles (yarn pack-toolings). */
+var MIRROR_TOOLINGS_TEMPLATE_DIR = "config/mirror-template/toolings";
+/** mirror-merge replay config in the tooling repo (local yarn mirror-merge). */
 var MIRROR_MERGE_CONFIG_PATH = "config/mirror-merge.json";
+/** GitHub raw URL base for committed mirror-template toolings (CI download). */
+var TOOLING_REPO_RAW_BASE = `https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main`;
+`${TOOLING_REPO_RAW_BASE}${MIRROR_TOOLINGS_TEMPLATE_DIR}${MIRROR_SYNC_BUNDLE}`;
+`${TOOLING_REPO_RAW_BASE}${MIRROR_TOOLINGS_TEMPLATE_DIR}${MIRROR_MERGE_BUNDLE}`;
+`${TOOLING_REPO_RAW_BASE}${MIRROR_MERGE_CONFIG_PATH}`;
 //#endregion
 //#region src/mirror-merge/config.ts
 function getSyncRepoRoot(startPath = dirname(fileURLToPath(import.meta.url))) {

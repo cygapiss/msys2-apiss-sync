@@ -35,15 +35,16 @@ Do not rewrite the base commit from sync tooling.
 
 ## Triggers
 
-- Primary: Block 2 mirror-poll on tooling repo (~hourly cron, push to `main`).
-- Block 3 -> Block 4: `workflow_dispatch` after package mirrors advance (`Notify.Enabled`).
+- Primary: mirror-poll on tooling repo (~hourly cron, push to `main`).
+- mirror-sync -> mirror-merge: `workflow_dispatch` after package mirrors advance (`Notify.Enabled`).
 - Expect ~1 h end-to-end after upstream changes; sub-hour timing is not guaranteed.
 - Fallback: manual `workflow_dispatch` on mirror-sync / mirror-merge.
 
 ## References
 
-- Pipeline entry: [`docs/usage.md`](docs/usage.md)
-- Block 1 tooling branch layout: [`docs/mirror-init.md` -- Tooling branch layout](docs/mirror-init.md#tooling-branch-layout)
-- Block 2 mirror-poll: [`docs/mirror-poll.md`](docs/mirror-poll.md)
-- Block 4 mirror-merge: [`docs/mirror-merge.md`](docs/mirror-merge.md)
+- Center design: [`docs/README.md`](docs/README.md)
+- Operator commands: [`docs/usage.md`](docs/usage.md)
+- mirror-init tooling branch layout: [`docs/mirror-init.md` -- Tooling branch layout](docs/mirror-init.md#tooling-branch-layout)
+- mirror-poll: [`docs/mirror-poll.md`](docs/mirror-poll.md)
+- mirror-merge: [`docs/mirror-merge.md`](docs/mirror-merge.md)
 - Agent context: `AGENTS.md`

@@ -1,12 +1,12 @@
 ---
-description: Mirror block modules (mirror-poll, mirror-sync, mirror-merge) import boundaries
+description: Mirror stage modules (mirror-poll, mirror-sync, mirror-merge) import boundaries
 globs: "src/mirror-*/**/*.ts"
 alwaysApply: false
 ---
 
-# Mirror block modules
+# Mirror stage modules
 
-Blocks under `src/mirror-init/`, `src/mirror-poll/`, `src/mirror-sync/`, and `src/mirror-merge/` are
+Stages under `src/mirror-init/`, `src/mirror-poll/`, `src/mirror-sync/`, and `src/mirror-merge/` are
 self-contained pipeline stages.
 
 ## Imports
@@ -19,15 +19,15 @@ Cross-module imports are limited to:
 Also allowed:
 
 - Node.js built-ins
-- Relative imports within the same block (`./config.ts`, `./queue.ts`, ...)
+- Relative imports within the same stage (`./config.ts`, `./queue.ts`, ...)
 
 ## Do not import
 
-- `../lib/*`, `../cli/*`, or other blocks (`../mirror-sync/*`, etc.)
+- `../lib/*`, `../cli/*`, or other stages (`../mirror-sync/*`, etc.)
 
-Shared helpers needed by a block belong in that block (or in `src/git/` /
-`src/types/` if truly shared). Do not pull Block 1 `repos.ts` or other lib code
-into mirror blocks.
+Shared helpers needed by a stage belong in that stage (or in `src/git/` /
+`src/types/` if truly shared). Do not pull mirror-init-only code from unrelated
+modules into other mirror stages.
 
-Orchestration that wires blocks together lives in `src/lib/` or `src/cli/`, not
-inside mirror block modules.
+Orchestration that wires stages together lives in `src/lib/` or `src/cli/`, not
+inside mirror stage modules.

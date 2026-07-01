@@ -12,8 +12,8 @@ Full copy-paste steps: [`docs/usage.md`](../docs/usage.md).
 
 | File | Purpose |
 |------|---------|
-| `mirror-poll.yml` | Block 2: [`mirror-poll.md`](../docs/mirror-poll.md) |
-| `config/mirror-template/mirror-merge.yml` (installed on **`msys2-apiss/msys2-apiss`**, branch `msys2-apiss-mirror-merge`; [Tooling branch layout](../docs/mirror-init.md#tooling-branch-layout)) | Block 4: [`mirror-merge.md`](../docs/mirror-merge.md) |
+| `mirror-poll.yml` | mirror-poll: [`mirror-poll.md`](../docs/mirror-poll.md) |
+| `config/mirror-template/mirror-merge.yml` (installed on **`msys2-apiss/msys2-apiss`**, branch `msys2-apiss-mirror-merge`; [Tooling branch layout](../docs/mirror-init.md#tooling-branch-layout)) | mirror-merge: [`mirror-merge.md`](../docs/mirror-merge.md) |
 
 Dry-run manifest verification: [`mirror-merge.md`](../docs/mirror-merge.md) and
 [`usage.md`](../docs/usage.md).
@@ -57,20 +57,20 @@ manual runs queue until the current run finishes.
 
 ## Dispatch events
 
-Both blocks use **`gh workflow run`** on the tooling branch:
+Both stages use **`gh workflow run`** on the tooling branch:
 
 | Name | From | To | Workflow |
 |------|------|-----|----------|
-| `workflow_dispatch_mirror_sync` | Block 2 ([`mirror-poll.md`](../docs/mirror-poll.md)) | Block 3 | [`mirror-sync.md`](../docs/mirror-sync.md) |
-| `workflow_dispatch_mirror_merge` | Block 3 ([`mirror-sync.md`](../docs/mirror-sync.md) notify) | Block 4 | [`mirror-merge.md`](../docs/mirror-merge.md) |
+| `workflow_dispatch_mirror_sync` | mirror-poll ([`mirror-poll.md`](../docs/mirror-poll.md)) | mirror-sync | [`mirror-sync.md`](../docs/mirror-sync.md) |
+| `workflow_dispatch_mirror_merge` | mirror-sync ([`mirror-sync.md`](../docs/mirror-sync.md) notify) | mirror-merge | [`mirror-merge.md`](../docs/mirror-merge.md) |
 
-Manual Block 4 runs use the same `workflow_dispatch` API (`gh workflow run mirror-merge.yml ...`).
+Manual mirror-merge runs use the same `workflow_dispatch` API (`gh workflow run mirror-merge.yml ...`).
 
 ## Secrets
 
 Set with `gh secret set`; not used by local tooling (`gh auth login` instead).
 
-- `SYNC_DISPATCH_TOKEN`: same PAT on **`msys2-apiss/msys2-apiss-sync`** (Block 2;
+- `SYNC_DISPATCH_TOKEN`: same PAT on **`msys2-apiss/msys2-apiss-sync`** (mirror-poll;
   [`mirror-poll.md`](../docs/mirror-poll.md)) and on package mirrors
   **`MSYS2-packages`**, **`MINGW-packages`** ([`mirror-sync.md`](../docs/mirror-sync.md)
   notify: `gh workflow run mirror-merge.yml` on destination when `Notify.Enabled` is true).

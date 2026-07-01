@@ -19,7 +19,7 @@ documentation-only instructions.
   `yarn mirror-merge`, `yarn test`, and `yarn typecheck`
 - Document operational and local runs in [`docs/usage.md`](../docs/usage.md)
   (copy-paste, run, read `[sync]` / `[PASS]` / counts / tables)
-- Block 3 runs on mirror repos via CI only; see [`docs/mirror-sync.md`](../docs/mirror-sync.md)
+- mirror-sync runs on mirror repos via CI only; see [`docs/mirror-sync.md`](../docs/mirror-sync.md)
 - Run the same command yourself before telling the user something works
 - Print progress and summary so success is obvious
 
@@ -33,10 +33,11 @@ documentation-only instructions.
 
 ## Docs
 
-- [`docs/usage.md`](../docs/usage.md): pipeline, GitHub ops, local testing
-- [`docs/mirror-poll.md`](../docs/mirror-poll.md): Block 2 poll and dispatch
-- [`docs/mirror-sync.md`](../docs/mirror-sync.md): Block 3 fast-forward and notify
-- [`docs/mirror-merge.md`](../docs/mirror-merge.md): Block 4 replay and CI
+- [`docs/usage.md`](../docs/usage.md): GitHub and local operational commands
+- [`docs/README.md`](../docs/README.md): documentation entry (pipeline architecture)
+- [`docs/mirror-poll.md`](../docs/mirror-poll.md): mirror-poll and dispatch
+- [`docs/mirror-sync.md`](../docs/mirror-sync.md): mirror-sync fast-forward and notify
+- [`docs/mirror-merge.md`](../docs/mirror-merge.md): mirror-merge replay and CI
 
 ## Agent behavior
 

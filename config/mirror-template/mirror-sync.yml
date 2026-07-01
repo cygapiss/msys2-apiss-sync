@@ -8,19 +8,19 @@ name: Mirror sync from upstream
 # master (or configured mirror branches) holds upstream history only;
 # do not commit workflows to mirrored branches.
 #
-# Block 3 CLI: mirror-sync.mjs downloaded at runtime from msys2-apiss-sync (see MIRROR_SYNC_BUNDLE_URL).
+# mirror-sync CLI: mirror-sync.mjs downloaded at runtime from msys2-apiss-sync (see MIRROR_SYNC_BUNDLE_URL).
 #
-# Triggers (Block 2 -> Block 3 and Block 3 -> Block 4 both use workflow_dispatch API):
-#   Block 2 -> Block 3: gh workflow run mirror-sync.yml on ref msys2-apiss-mirror-sync
+# Triggers (mirror-poll -> mirror-sync and mirror-sync -> mirror-merge both use workflow_dispatch API):
+#   mirror-poll -> mirror-sync: gh workflow run mirror-sync.yml on ref msys2-apiss-mirror-sync
 #     with inputs.event_type=workflow_dispatch_mirror_sync.
-#   Block 3 -> Block 4: gh workflow run mirror-merge.yml on ref msys2-apiss-mirror-merge
+#   mirror-sync -> mirror-merge: gh workflow run mirror-merge.yml on ref msys2-apiss-mirror-merge
 #     with inputs.event_type=workflow_dispatch_mirror_merge (Notify step; package mirrors only).
 
 on:
   workflow_dispatch:
     inputs:
       event_type:
-        description: 'Block 2 dispatch label'
+        description: 'mirror-poll dispatch label'
         required: false
         default: workflow_dispatch_mirror_sync
         type: string

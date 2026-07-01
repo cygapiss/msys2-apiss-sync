@@ -113,7 +113,7 @@ describe('shouldDispatchMirrorMerge', () => {
 });
 
 describe('verifyMirrorSyncEventType', () => {
-  test('accepts Block 2 dispatch label and skips when unset', () => {
+  test('accepts mirror-poll dispatch label and skips when unset', () => {
     expect(() => verifyMirrorSyncEventType(undefined)).not.toThrow();
     expect(() => verifyMirrorSyncEventType(WORKFLOW_DISPATCH_MIRROR_SYNC)).not.toThrow();
   });

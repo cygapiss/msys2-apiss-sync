@@ -1,8 +1,8 @@
-# mirror-merge (Block 4)
+# mirror-merge
 
 `yarn mirror-merge` replays `MSYS2-packages` and `MINGW-packages` mirror history into
 `msys2-apiss/msys2-apiss` on `upstream`, `upstream-ports`, and `upstream-ports-mingw`.
-Pipeline: [`usage.md`](usage.md). Code: `src/mirror-merge/`. CI workflow:
+Pipeline: [`README.md`](README.md). Code: `src/mirror-merge/`. CI workflow:
 [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on destination branch
 **`msys2-apiss-mirror-merge`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)).
 
@@ -22,11 +22,11 @@ yarn mirror-merge [options]
 | `--destination-path <path>` | Existing clone (default `.work/destination/msys2-apiss`) |
 | `--log-file <path>` | Log to file (`--log-append`, `--log-to-console` optional) |
 
-Mirrors must exist under `.work/mirrors/` (Block 1 [`mirror-init`](mirror-init.md)).
+Mirrors must exist under `.work/mirrors/` ([`mirror-init`](mirror-init.md)).
 
 ## Role
 
-Block 4 reads mirror git history, merge-sorts ports + ports-mingw commits by replay rank
+mirror-merge reads mirror git history, merge-sorts ports + ports-mingw commits by replay rank
 (committer date, then author date, source id, SHA), replays each entry onto the destination
 tree, and pushes `upstream*`. Upstream author and committer metadata are preserved.
 Commit messages use the template in [`config/mirror-merge.json`](../config/mirror-merge.json).
@@ -47,10 +47,10 @@ Replay tip branch: `upstream` (`Destination.ReplayTip`). First replayed commit p
 |---------|--------|
 | `yarn mirror-merge` | Local tooling checkout |
 | [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) | CI on `msys2-apiss/msys2-apiss`, ref **`msys2-apiss-mirror-merge`** |
-| Block 3 notify | [`mirror-sync.md`](mirror-sync.md) -- package mirrors with `Notify.Enabled: true` |
+| mirror-sync notify | [`mirror-sync.md`](mirror-sync.md) -- package mirrors with `Notify.Enabled: true` |
 | `workflow_dispatch` | Manual (`clean=true` for full reset) |
 
-Block 1 [`yarn mirror-init --push`](mirror-init.md) can dispatch Block 4 on the destination
+[`yarn mirror-init --push`](mirror-init.md) can dispatch mirror-merge on the destination
 when bootstrapping tooling.
 
 ## Destination branches
@@ -106,8 +106,8 @@ GitHub Actions secrets: [`mirror-sync.md`](mirror-sync.md#ci-secrets),
 
 ## Operator flows
 
-**GitHub (usual path):** Block 2/3 advance mirrors -> Block 4 CI runs automatically
-when `Notify.Enabled` is true.
+**GitHub (usual path):** mirror-poll/mirror-sync advance mirrors -> mirror-merge CI runs
+automatically when `Notify.Enabled` is true.
 
 ```bash
 gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss --ref msys2-apiss-mirror-merge
@@ -146,11 +146,12 @@ gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss --ref msys2-apis
 yarn mirror-merge --dry-run --skip-fetch --destination-path .work/destination/msys2-apiss
 ```
 
-More local testing: [`usage.md`](usage.md#dry-run-and-verify-block-4).
+More local testing: [`usage.md`](usage.md#dry-run-and-verify-mirror-merge).
 
 ## Related
 
-- [`mirror-sync.md`](mirror-sync.md) -- Block 3 upstream refresh before replay
-- [`mirror-poll.md`](mirror-poll.md) -- Block 2 tip compare
+- [`mirror-sync.md`](mirror-sync.md) -- upstream refresh before replay
+- [`mirror-poll.md`](mirror-poll.md) -- tip compare
 - [`mirror-init.md`](mirror-init.md) -- installs `mirror-merge.yml` tooling branch
-- [`usage.md`](usage.md) -- pipeline map and secrets
+- [`README.md`](README.md) -- documentation entry
+- [`usage.md`](usage.md) -- operator commands and secrets

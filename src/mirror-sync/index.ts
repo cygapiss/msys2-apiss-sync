@@ -20,7 +20,7 @@ export interface MirrorSyncResult {
   Advanced: boolean;
   PrimarySha: string | null;
   PrimaryRef: string | null;
-  /** True when mirror advanced and Notify.Enabled: dispatch Block 4 CI. */
+  /** True when mirror advanced and Notify.Enabled: dispatch mirror-merge CI. */
   DispatchMirrorMerge: boolean;
   Notify: {
     Enabled: boolean;

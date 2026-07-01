@@ -14,29 +14,29 @@ export type GhDispatchAttemptResult = {
   detail?: string;
 };
 
-export type MirrorBlockDispatchSpec = {
-  Block: string;
+export type MirrorDispatchSpec = {
+  Mirror: string;
   ToolingBranch: string;
   WorkflowFile: string;
   WorkflowInputs: readonly (readonly [string, string])[];
 };
 
-export const MIRROR_SYNC_BLOCK: MirrorBlockDispatchSpec = {
-  Block: 'mirror-sync',
+export const MIRROR_SYNC_DISPATCH: MirrorDispatchSpec = {
+  Mirror: 'mirror-sync',
   ToolingBranch: MIRROR_SYNC_BRANCH,
   WorkflowFile: 'mirror-sync.yml',
   WorkflowInputs: [['event_type', WORKFLOW_DISPATCH_MIRROR_SYNC]]
 };
 
-export const MIRROR_MERGE_BLOCK: MirrorBlockDispatchSpec = {
-  Block: 'mirror-merge',
+export const MIRROR_MERGE_DISPATCH: MirrorDispatchSpec = {
+  Mirror: 'mirror-merge',
   ToolingBranch: MIRROR_MERGE_BRANCH,
   WorkflowFile: 'mirror-merge.yml',
   WorkflowInputs: [['event_type', WORKFLOW_DISPATCH_MIRROR_MERGE]]
 };
 
-export const MIRROR_POLL_BLOCK: MirrorBlockDispatchSpec = {
-  Block: 'mirror-poll',
+export const MIRROR_POLL_DISPATCH: MirrorDispatchSpec = {
+  Mirror: 'mirror-poll',
   ToolingBranch: TOOLING_DEFAULT_BRANCH,
   WorkflowFile: 'mirror-poll.yml',
   WorkflowInputs: []

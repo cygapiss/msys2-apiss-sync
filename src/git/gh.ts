@@ -3,11 +3,9 @@ import { spawnSync } from 'node:child_process';
 import type { Logger } from './log.ts';
 import {
   type GhDispatchAttemptResult,
-  type MirrorBlockDispatchSpec,
-  MIRROR_MERGE_BLOCK,
-  MIRROR_SYNC_BLOCK,
+  type MirrorDispatchSpec,
   parseGhDispatchFailure
-} from './mirror-block-dispatch.ts';
+} from './mirror-dispatch.ts';
 
 export function runGh(args: string[]): { ok: boolean; stdout: string; stderr: string } {
   const result = spawnSync('gh', args, {
@@ -144,10 +142,10 @@ export function ghSetRepoDefaultBranch(
   }
 }
 
-function ghMirrorBlockRunInProgress(
+function ghMirrorRunInProgress(
   owner: string,
   repoName: string,
-  spec: MirrorBlockDispatchSpec
+  spec: MirrorDispatchSpec
 ): boolean | null {
   const result = runGh([
     'run',
@@ -173,15 +171,15 @@ function ghMirrorBlockRunInProgress(
   return result.stdout !== '0' && result.stdout.length > 0;
 }
 
-function ghAttemptMirrorBlockDispatch(
+function ghAttemptMirrorDispatch(
   owner: string,
   repoName: string,
-  spec: MirrorBlockDispatchSpec,
+  spec: MirrorDispatchSpec,
   logger?: Logger
 ): GhDispatchAttemptResult {
-  const inProgress = ghMirrorBlockRunInProgress(owner, repoName, spec);
+  const inProgress = ghMirrorRunInProgress(owner, repoName, spec);
   if (inProgress === true) {
-    logger?.write(`Skip ${spec.Block} dispatch on ${owner}/${repoName}: run already in progress`);
+    logger?.write(`Skip ${spec.Mirror} dispatch on ${owner}/${repoName}: run already in progress`);
     return { ok: false, skipped: true };
   }
   const args = [
@@ -201,32 +199,32 @@ function ghAttemptMirrorBlockDispatch(
   return { ok: false, ...parseGhDispatchFailure(`${result.stderr} ${result.stdout}`.trim()) };
 }
 
-function throwMirrorBlockDispatchFailure(
+function throwMirrorDispatchFailure(
   owner: string,
   repoName: string,
-  spec: MirrorBlockDispatchSpec,
+  spec: MirrorDispatchSpec,
   result: GhDispatchAttemptResult,
   forbiddenDetail?: string
 ): never {
   if (result.notFound) {
-    throw new Error(`${spec.Block} failed for ${owner}/${repoName}: ${spec.WorkflowFile} not found`);
+    throw new Error(`${spec.Mirror} failed for ${owner}/${repoName}: ${spec.WorkflowFile} not found`);
   }
   if (result.forbidden) {
     throw new Error(
-      `${spec.Block} failed for ${owner}/${repoName} (403): ` +
+      `${spec.Mirror} failed for ${owner}/${repoName} (403): ` +
         (forbiddenDetail ??
-          `gh cannot dispatch ${spec.Block}; check gh auth or SYNC_DISPATCH_TOKEN`)
+          `gh cannot dispatch ${spec.Mirror}; check gh auth or SYNC_DISPATCH_TOKEN`)
     );
   }
   const suffix = result.detail ? `: ${result.detail}` : '';
-  throw new Error(`${spec.Block} failed for ${owner}/${repoName}${suffix}`);
+  throw new Error(`${spec.Mirror} failed for ${owner}/${repoName}${suffix}`);
 }
 
-function handleMirrorBlockDispatchResult(
+function handleMirrorDispatchResult(
   result: GhDispatchAttemptResult,
   owner: string,
   repoName: string,
-  spec: MirrorBlockDispatchSpec,
+  spec: MirrorDispatchSpec,
   logger: Logger,
   options?: { ForbiddenDetail?: string }
 ): 'done' | 'not_found' {
@@ -240,11 +238,11 @@ function handleMirrorBlockDispatchResult(
   if (result.notFound) {
     return 'not_found';
   }
-  throwMirrorBlockDispatchFailure(owner, repoName, spec, result, options?.ForbiddenDetail);
+  throwMirrorDispatchFailure(owner, repoName, spec, result, options?.ForbiddenDetail);
 }
 
-export function ghDispatchMirrorBlock(
-  spec: MirrorBlockDispatchSpec,
+export function ghDispatchMirror(
+  spec: MirrorDispatchSpec,
   owner: string,
   repoName: string,
   defaultBranch: string,
@@ -263,9 +261,9 @@ export function ghDispatchMirrorBlock(
       toolingDefaultBranch = true;
     }
 
-    logger.write(`Dispatching ${spec.Block} on ${owner}/${repoName}`);
-    let result = ghAttemptMirrorBlockDispatch(owner, repoName, spec, logger);
-    if (handleMirrorBlockDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
+    logger.write(`Dispatching ${spec.Mirror} on ${owner}/${repoName}`);
+    let result = ghAttemptMirrorDispatch(owner, repoName, spec, logger);
+    if (handleMirrorDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
       return;
     }
 
@@ -277,20 +275,20 @@ export function ghDispatchMirrorBlock(
       toolingDefaultBranch = true;
     }
 
-    result = ghAttemptMirrorBlockDispatch(owner, repoName, spec, logger);
-    if (handleMirrorBlockDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
+    result = ghAttemptMirrorDispatch(owner, repoName, spec, logger);
+    if (handleMirrorDispatchResult(result, owner, repoName, spec, logger, options) === 'done') {
       return;
     }
 
-    const newMirrorHint = spec.Block === 'mirror-sync' ? ' (normal for new mirrors)' : '';
+    const newMirrorHint = spec.Mirror === 'mirror-sync' ? ' (normal for new mirrors)' : '';
     logger.write(
       `${repoName}: ${spec.WorkflowFile} not in GitHub Actions registry yet; dispatch skipped${newMirrorHint}`,
       'Warn'
     );
     logger.write('  Wait a few minutes, then retry:', 'Warn');
-    if (spec.Block === 'mirror-sync') {
+    if (spec.Mirror === 'mirror-sync') {
       logger.write(`    yarn mirror-init --push --repo ${repoName} --skip-fetch`, 'Warn');
-    } else if (spec.Block === 'mirror-merge' || spec.Block === 'mirror-poll') {
+    } else if (spec.Mirror === 'mirror-merge' || spec.Mirror === 'mirror-poll') {
       logger.write('    yarn mirror-init --push', 'Warn');
     }
     const workflowInputs = spec.WorkflowInputs.map(([key, value]) => `-f ${key}=${value}`).join(' ');
@@ -305,5 +303,5 @@ export function ghDispatchMirrorBlock(
   }
 }
 
-export type { GhDispatchAttemptResult, MirrorBlockDispatchSpec } from './mirror-block-dispatch.ts';
-export { MIRROR_MERGE_BLOCK, MIRROR_POLL_BLOCK, MIRROR_SYNC_BLOCK } from './mirror-block-dispatch.ts';
+export type { GhDispatchAttemptResult, MirrorDispatchSpec } from './mirror-dispatch.ts';
+export { MIRROR_MERGE_DISPATCH, MIRROR_POLL_DISPATCH, MIRROR_SYNC_DISPATCH } from './mirror-dispatch.ts';
