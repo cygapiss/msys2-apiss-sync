@@ -8,6 +8,7 @@ import {
   configureMirrorSyncPushTransport,
   getMirrorSyncNotify,
   mirrorBranchNeedsUpdate,
+  resolveDispatchMirrorMerge,
   runMirrorSync,
   shouldDispatchMirrorMerge,
   validateMirrorSyncConfig,
@@ -109,6 +110,27 @@ describe('shouldDispatchMirrorMerge', () => {
       Advanced: false,
       Notify: { Enabled: true, Repository: 'cygapiss/msys2-apiss' }
     })).toBe(false);
+  });
+});
+
+describe('resolveDispatchMirrorMerge', () => {
+  test('skips dispatch when mirror-merge is already active on notify target', () => {
+    const result = {
+      Advanced: true,
+      PrimarySha: 'abc123',
+      PrimaryRef: 'refs/heads/master',
+      Notify: {
+        Enabled: true,
+        Repository: 'cygapiss/msys2-apiss',
+        EventType: 'workflow_dispatch_mirror_merge'
+      },
+      Branches: [],
+      DispatchMirrorMerge: true
+    };
+    expect(resolveDispatchMirrorMerge(result)).toBe(true);
+    expect(resolveDispatchMirrorMerge(result, { MirrorMergeBusy: false })).toBe(true);
+    expect(resolveDispatchMirrorMerge(result, { MirrorMergeBusy: true })).toBe(false);
+    expect(resolveDispatchMirrorMerge(result, { MirrorMergeBusy: null })).toBe(true);
   });
 });
 

@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 import { runGit, runGitText, githubSshPushUrl } from '../git/index.ts';
 import type { Logger } from '../git/log.ts';
+import { ghMirrorWorkflowRunBusy } from '../git/gh.ts';
+import { MIRROR_MERGE_DISPATCH } from '../git/mirror-dispatch.ts';
 import { WORKFLOW_DISPATCH_MIRROR_MERGE, WORKFLOW_DISPATCH_MIRROR_SYNC } from '../types/constants.ts';
 import type { MirrorSyncBranchPair, MirrorSyncConfig } from '../types/mirror-sync-config.ts';
 
@@ -74,6 +76,38 @@ export function getMirrorSyncNotify(config: MirrorSyncConfig): MirrorSyncResult[
 
 export function shouldDispatchMirrorMerge(result: Pick<MirrorSyncResult, 'Advanced' | 'Notify'>): boolean {
   return result.Advanced && result.Notify.Enabled;
+}
+
+export function resolveDispatchMirrorMerge(
+  result: MirrorSyncResult,
+  options?: { MirrorMergeBusy?: boolean | null }
+): boolean {
+  if (!shouldDispatchMirrorMerge(result)) {
+    return false;
+  }
+  if (options?.MirrorMergeBusy === true) {
+    return false;
+  }
+  return true;
+}
+
+function parseNotifyRepository(repository: string | undefined): { Owner: string; Repo: string } | null {
+  if (!repository) {
+    return null;
+  }
+  const parts = repository.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+  return { Owner: parts[0], Repo: parts[1] };
+}
+
+function mirrorMergeBusyOnNotifyTarget(notify: MirrorSyncResult['Notify']): boolean | null {
+  const target = parseNotifyRepository(notify.Repository);
+  if (!target) {
+    return null;
+  }
+  return ghMirrorWorkflowRunBusy(target.Owner, target.Repo, MIRROR_MERGE_DISPATCH);
 }
 
 export function verifyMirrorSyncEventType(eventType: string | undefined): void {
@@ -274,10 +308,24 @@ export function runMirrorSyncCli(): void {
       Config: loadMirrorSyncConfig(configPath),
       Logger: logger
     });
-    if (process.env.GITHUB_OUTPUT) {
-      writeGitHubOutput(process.env.GITHUB_OUTPUT, result);
+    const mirrorMergeBusy = result.Notify.Enabled ? mirrorMergeBusyOnNotifyTarget(result.Notify) : null;
+    const dispatchMirrorMerge = resolveDispatchMirrorMerge(result, { MirrorMergeBusy: mirrorMergeBusy });
+    if (shouldDispatchMirrorMerge(result) && mirrorMergeBusy === true) {
+      logger.write(
+        `Skip mirror-merge dispatch: run already active on ${result.Notify.Repository ?? '<unknown>'}`
+      );
     }
-    logger.write(`done. advanced=${result.Advanced} dispatch_mirror_merge=${result.DispatchMirrorMerge}`);
+    if (shouldDispatchMirrorMerge(result) && mirrorMergeBusy === null) {
+      logger.write('mirror-merge busy check failed; dispatching anyway', 'Warn');
+    }
+    const outputResult: MirrorSyncResult = {
+      ...result,
+      DispatchMirrorMerge: dispatchMirrorMerge
+    };
+    if (process.env.GITHUB_OUTPUT) {
+      writeGitHubOutput(process.env.GITHUB_OUTPUT, outputResult);
+    }
+    logger.write(`done. advanced=${result.Advanced} dispatch_mirror_merge=${dispatchMirrorMerge}`);
   } catch (error) {
     logger.write(error instanceof Error ? error.message : String(error), 'Error');
     process.exitCode = 1;

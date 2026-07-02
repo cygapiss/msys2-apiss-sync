@@ -142,11 +142,12 @@ export function ghSetRepoDefaultBranch(
   }
 }
 
-function ghMirrorRunInProgress(
+function ghMirrorWorkflowRunCount(
   owner: string,
   repoName: string,
-  spec: MirrorDispatchSpec
-): boolean | null {
+  spec: MirrorDispatchSpec,
+  status: 'in_progress' | 'queued'
+): number | null {
   const result = runGh([
     'run',
     'list',
@@ -157,7 +158,7 @@ function ghMirrorRunInProgress(
     '--branch',
     spec.ToolingBranch,
     '--status',
-    'in_progress',
+    status,
     '--limit',
     '1',
     '--json',
@@ -168,7 +169,37 @@ function ghMirrorRunInProgress(
   if (!result.ok) {
     return null;
   }
-  return result.stdout !== '0' && result.stdout.length > 0;
+  const count = Number.parseInt(result.stdout, 10);
+  return Number.isFinite(count) ? count : null;
+}
+
+export function ghMirrorWorkflowRunBusy(
+  owner: string,
+  repoName: string,
+  spec: MirrorDispatchSpec
+): boolean | null {
+  for (const status of ['in_progress', 'queued'] as const) {
+    const count = ghMirrorWorkflowRunCount(owner, repoName, spec, status);
+    if (count === null) {
+      return null;
+    }
+    if (count > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function ghMirrorRunInProgress(
+  owner: string,
+  repoName: string,
+  spec: MirrorDispatchSpec
+): boolean | null {
+  const count = ghMirrorWorkflowRunCount(owner, repoName, spec, 'in_progress');
+  if (count === null) {
+    return null;
+  }
+  return count > 0;
 }
 
 function ghAttemptMirrorDispatch(

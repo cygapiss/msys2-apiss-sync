@@ -28,7 +28,7 @@
     }
   ],
   "Replay": {
-    "MinReplayAgeMinutes": 5,
+    "MinReplayAgeMinutes": 15,
     "SkipEmptyTreeDiff": true,
     "LineEnding": "LF",
     "PushIntervalCommits": 5000
