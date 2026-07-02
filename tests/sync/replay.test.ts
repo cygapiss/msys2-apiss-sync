@@ -169,6 +169,7 @@ describe('formatReplayCommitMessage', () => {
       '',
       'line one',
       'line two',
+      '',
       'Source: msys2/MSYS2-packages@abc123'
     ].join('\n'));
   });
@@ -185,6 +186,7 @@ describe('formatReplayCommitMessage', () => {
       UpstreamSha: 'def456'
     })).toBe([
       '[ports-mingw] update bar',
+      '',
       'Source: msys2/MINGW-packages@def456'
     ].join('\n'));
   });

@@ -23,7 +23,7 @@ const testConfig: SyncConfig = {
       SortKey: 'ports',
       CursorBranch: 'upstream-ports',
       UpstreamRepo: 'msys2/MSYS2-packages',
-      CommitMessage: '[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}'
+      CommitMessage: '[{SortKey}] {Subject}{BodyBlock}\nSource: {UpstreamRepo}@{UpstreamSha}'
     },
     {
       Repo: 'MINGW-packages',
@@ -32,7 +32,7 @@ const testConfig: SyncConfig = {
       SortKey: 'ports-mingw',
       CursorBranch: 'upstream-ports-mingw',
       UpstreamRepo: 'msys2/MINGW-packages',
-      CommitMessage: '[{SortKey}] {Subject}{BodyBlock}Source: {UpstreamRepo}@{UpstreamSha}'
+      CommitMessage: '[{SortKey}] {Subject}{BodyBlock}\nSource: {UpstreamRepo}@{UpstreamSha}'
     }
   ],
   Replay: {
