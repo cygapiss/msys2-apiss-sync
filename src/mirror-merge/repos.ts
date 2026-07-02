@@ -296,15 +296,16 @@ export function clearDestinationSyncBranches(destinationPath: string, config: Sy
 export function pushDestinationBranches(
   destinationPath: string,
   config: SyncConfig,
-  forceReplayBranch: boolean
+  force: boolean
 ): void {
   const replayBranch = config.Destination.ReplayTip;
-  runGit(destinationPath, ['push', 'origin', ...(forceReplayBranch ? ['--force'] : []), replayBranch]);
+  const forceArgs = force ? ['--force'] as const : [];
+  runGit(destinationPath, ['push', 'origin', ...forceArgs, replayBranch]);
 
   for (const source of config.Sources) {
     const sha = getLocalDestinationBranchSha(destinationPath, source.CursorBranch);
     if (sha) {
-      runGit(destinationPath, ['push', 'origin', source.CursorBranch]);
+      runGit(destinationPath, ['push', 'origin', ...forceArgs, source.CursorBranch]);
     } else {
       runGit(destinationPath, ['push', 'origin', '--delete', source.CursorBranch]);
     }

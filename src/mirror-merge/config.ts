@@ -30,6 +30,7 @@ export interface SyncConfig {
     MinReplayAgeMinutes?: number;
     SkipEmptyTreeDiff: boolean;
     LineEnding: string;
+    PushIntervalCommits?: number;
   };
 }
 

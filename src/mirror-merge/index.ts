@@ -80,6 +80,10 @@ export function formatMirrorMergeCursorSummary(
     .join(' ');
 }
 
+export function shouldPushReplayCheckpoint(replayed: number, pushInterval: number): boolean {
+  return pushInterval > 0 && replayed > 0 && replayed % pushInterval === 0;
+}
+
 export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorMergeResult> {
   const clean = Boolean(input.Clean);
   const dryRun = Boolean(input.DryRun);
@@ -246,6 +250,8 @@ export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorM
 
   let replayed = 0;
   const skipEmpty = Boolean(config.Replay.SkipEmptyTreeDiff);
+  const pushInterval = config.Replay.PushIntervalCommits ?? 5000;
+  const forcePush = clean || isFullReplay;
 
   for (let index = 0; index < queue.length; index++) {
     const entry = queue[index]!;
@@ -314,6 +320,17 @@ export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorM
           updateDestinationCursorBranchRefs(destPath, config, updates);
         }
       }
+
+      if (push && shouldPushReplayCheckpoint(replayed, pushInterval)) {
+        runGit(destPath, ['reset', '--hard', 'HEAD']);
+        const checkpointTip = runGitText(destPath, ['rev-parse', 'HEAD']).trim();
+        updateDestinationSyncBranchRefs(destPath, config, {
+          ReplayTipSha: checkpointTip,
+          CursorDestShas: lastDestShas
+        });
+        logger.write(`Checkpoint push after ${replayed} replayed commit(s); tip=${checkpointTip.slice(0, 8)}`);
+        pushDestinationBranches(destPath, config, forcePush);
+      }
     }
 
     if (shouldLogQueueProgress(index + 1, queue.length)) {
@@ -341,7 +358,7 @@ export async function runMirrorMerge(input: MirrorMergeOptions): Promise<MirrorM
   logger.write(`Replayed ${replayed} commit(s); tip=${replayTip.slice(0, 8)}`);
   if (push) {
     logger.write('Pushing destination branches');
-    pushDestinationBranches(destPath, config, clean || isFullReplay);
+    pushDestinationBranches(destPath, config, forcePush);
   } else {
     logger.write('Skipping push (pass --push to publish destination branches)');
   }

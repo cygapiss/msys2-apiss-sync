@@ -11,7 +11,7 @@ import {
   pushMirrorContentBranchIfMissing,
   repairSyncBranchLayout
 } from '../../src/mirror-init/mirror.ts';
-import { checkoutDestinationReplayBranch } from '../../src/mirror-merge/repos.ts';
+import { checkoutDestinationReplayBranch, pushDestinationBranches } from '../../src/mirror-merge/repos.ts';
 import {
   checkoutNewDestinationBranchFromBase,
   resolveUpstreamCursorSha,
@@ -497,6 +497,38 @@ describe('bootstrapMirrorFromUpstreamRoot', () => {
       expect(runGit(mirrorPath, ['rev-parse', MIRROR_SYNC_BRANCH]).trim()).toBe(rootSha);
       expect(runGit(mirrorPath, ['rev-parse', 'refs/remotes/origin/master']).trim()).toBe(rootSha);
       expect(runGit(mirrorPath, ['rev-list', '--count', 'master']).trim()).toBe('1');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('pushDestinationBranches', () => {
+  test('force push updates replay and cursor branches on origin', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-sync-push-branches-'));
+    try {
+      const bare = join(root, 'origin.git');
+      const destPath = join(root, 'dest');
+      spawnSync('git', ['init', '--bare', bare], { encoding: 'utf8', windowsHide: true });
+      initTestRepo(destPath);
+      runGit(destPath, ['commit', '--allow-empty', '-m', 'old']);
+      const oldSha = runGit(destPath, ['rev-parse', 'HEAD']).trim();
+      runGit(destPath, ['branch', '-M', 'upstream']);
+      runGit(destPath, ['remote', 'add', 'origin', bare]);
+      runGit(destPath, ['push', '-u', 'origin', 'upstream']);
+
+      runGit(destPath, ['commit', '--allow-empty', '-m', 'new']);
+      const newSha = runGit(destPath, ['rev-parse', 'HEAD']).trim();
+      runGit(destPath, ['branch', 'upstream-ports', newSha]);
+      runGit(destPath, ['branch', 'upstream-ports-mingw', newSha]);
+
+      const config = loadSyncConfig();
+      pushDestinationBranches(destPath, config, true);
+
+      expect(runGit(bare, ['rev-parse', 'refs/heads/upstream']).trim()).toBe(newSha);
+      expect(runGit(bare, ['rev-parse', 'refs/heads/upstream-ports']).trim()).toBe(newSha);
+      expect(runGit(bare, ['rev-parse', 'refs/heads/upstream-ports-mingw']).trim()).toBe(newSha);
+      expect(oldSha).not.toBe(newSha);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

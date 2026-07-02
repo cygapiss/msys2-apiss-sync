@@ -835,17 +835,19 @@ function clearDestinationSyncBranches(destinationPath, config, logger) {
 		]);
 	} catch {}
 }
-function pushDestinationBranches(destinationPath, config, forceReplayBranch) {
+function pushDestinationBranches(destinationPath, config, force) {
 	const replayBranch = config.Destination.ReplayTip;
+	const forceArgs = force ? ["--force"] : [];
 	runGit(destinationPath, [
 		"push",
 		"origin",
-		...forceReplayBranch ? ["--force"] : [],
+		...forceArgs,
 		replayBranch
 	]);
 	for (const source of config.Sources) if (getLocalDestinationBranchSha(destinationPath, source.CursorBranch)) runGit(destinationPath, [
 		"push",
 		"origin",
+		...forceArgs,
 		source.CursorBranch
 	]);
 	else runGit(destinationPath, [
@@ -895,6 +897,9 @@ function resolveMirrorMergeMode(input) {
 }
 function formatMirrorMergeCursorSummary(config, upstreamCursors) {
 	return config.Sources.map((source) => `${source.SortKey}=${(upstreamCursors[source.SortKey] ?? "none").slice(0, 8)}`).join(" ");
+}
+function shouldPushReplayCheckpoint(replayed, pushInterval) {
+	return pushInterval > 0 && replayed > 0 && replayed % pushInterval === 0;
 }
 async function runMirrorMerge(input) {
 	const clean = Boolean(input.Clean);
@@ -1010,6 +1015,8 @@ async function runMirrorMerge(input) {
 	logger.write("Precomputed fork-safe cursor branch flags");
 	let replayed = 0;
 	const skipEmpty = Boolean(config.Replay.SkipEmptyTreeDiff);
+	const pushInterval = config.Replay.PushIntervalCommits ?? 5e3;
+	const forcePush = clean || isFullReplay;
 	for (let index = 0; index < queue.length; index++) {
 		const entry = queue[index];
 		const mirrorPath = mirrorPaths.get(entry.SourceId);
@@ -1064,6 +1071,20 @@ async function runMirrorMerge(input) {
 				}
 				if (Object.keys(updates).length > 0) updateDestinationCursorBranchRefs(destPath, config, updates);
 			}
+			if (push && shouldPushReplayCheckpoint(replayed, pushInterval)) {
+				runGit(destPath, [
+					"reset",
+					"--hard",
+					"HEAD"
+				]);
+				const checkpointTip = runGitText(destPath, ["rev-parse", "HEAD"]).trim();
+				updateDestinationSyncBranchRefs(destPath, config, {
+					ReplayTipSha: checkpointTip,
+					CursorDestShas: lastDestShas
+				});
+				logger.write(`Checkpoint push after ${replayed} replayed commit(s); tip=${checkpointTip.slice(0, 8)}`);
+				pushDestinationBranches(destPath, config, forcePush);
+			}
 		}
 		if (shouldLogQueueProgress(index + 1, queue.length)) {
 			const processed = index + 1;
@@ -1092,7 +1113,7 @@ async function runMirrorMerge(input) {
 	logger.write(`Replayed ${replayed} commit(s); tip=${replayTip.slice(0, 8)}`);
 	if (push) {
 		logger.write("Pushing destination branches");
-		pushDestinationBranches(destPath, config, clean || isFullReplay);
+		pushDestinationBranches(destPath, config, forcePush);
 	} else logger.write("Skipping push (pass --push to publish destination branches)");
 	logger.write("Mirror-Merge done.");
 	return {

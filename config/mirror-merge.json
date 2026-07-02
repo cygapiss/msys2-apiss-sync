@@ -30,6 +30,7 @@
   "Replay": {
     "MinReplayAgeMinutes": 5,
     "SkipEmptyTreeDiff": true,
-    "LineEnding": "LF"
+    "LineEnding": "LF",
+    "PushIntervalCommits": 5000
   }
 }

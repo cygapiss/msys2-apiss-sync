@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import {
   formatMirrorMergeCursorSummary,
-  resolveMirrorMergeMode
+  resolveMirrorMergeMode,
+  shouldPushReplayCheckpoint
 } from '../../src/mirror-merge/index.ts';
 import { shouldLogQueueProgress } from '../../src/mirror-merge/log.ts';
 import type { SyncConfig } from '../../src/mirror-merge/config.ts';
@@ -67,6 +68,21 @@ describe('shouldLogQueueProgress', () => {
     expect(shouldLogQueueProgress(150)).toBe(false);
     expect(shouldLogQueueProgress(200)).toBe(true);
     expect(shouldLogQueueProgress(69078, 69078)).toBe(true);
+  });
+});
+
+describe('shouldPushReplayCheckpoint', () => {
+  test('returns false when interval is zero', () => {
+    expect(shouldPushReplayCheckpoint(5000, 0)).toBe(false);
+  });
+
+  test('returns false before the first interval', () => {
+    expect(shouldPushReplayCheckpoint(4999, 5000)).toBe(false);
+  });
+
+  test('returns true on each interval boundary', () => {
+    expect(shouldPushReplayCheckpoint(5000, 5000)).toBe(true);
+    expect(shouldPushReplayCheckpoint(10000, 5000)).toBe(true);
   });
 });
 
