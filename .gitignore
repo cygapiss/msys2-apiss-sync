@@ -19,3 +19,4 @@ dist/
 
 out.txt
 .yarn
+/package.tgz
