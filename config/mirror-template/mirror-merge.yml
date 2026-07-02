@@ -71,9 +71,9 @@ jobs:
           set -euo pipefail
           mkdir -p .github/toolings/config
           curl -fsSL -o .github/toolings/mirror-merge.mjs \
-            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-template/toolings/mirror-merge.mjs"
+            "https://raw.githubusercontent.com/cygapiss/msys2-apiss-sync/main/config/mirror-template/toolings/mirror-merge.mjs"
           curl -fsSL -o .github/toolings/config/mirror-merge.json \
-            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-merge.json"
+            "https://raw.githubusercontent.com/cygapiss/msys2-apiss-sync/main/config/mirror-merge.json"
 
       - name: Run mirror merge
         run: |

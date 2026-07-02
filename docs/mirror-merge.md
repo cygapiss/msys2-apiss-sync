@@ -1,7 +1,7 @@
 # mirror-merge
 
 `yarn mirror-merge` replays `MSYS2-packages` and `MINGW-packages` mirror history into
-`msys2-apiss/msys2-apiss` on `upstream`, `upstream-ports`, and `upstream-ports-mingw`.
+`cygapiss/msys2-apiss` on `upstream`, `upstream-ports`, and `upstream-ports-mingw`.
 Pipeline: [`README.md`](README.md). Code: `src/mirror-merge/`. CI workflow:
 [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on destination branch
 **`msys2-apiss-mirror-merge`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)).
@@ -46,7 +46,7 @@ Replay tip branch: `upstream` (`Destination.ReplayTip`). First replayed commit p
 | Trigger | Where |
 |---------|--------|
 | `yarn mirror-merge` | Local tooling checkout |
-| [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) | CI on `msys2-apiss/msys2-apiss`, ref **`msys2-apiss-mirror-merge`** |
+| [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) | CI on `cygapiss/msys2-apiss`, ref **`msys2-apiss-mirror-merge`** |
 | mirror-sync notify | [`mirror-sync.md`](mirror-sync.md) -- package mirrors with `Notify.Enabled: true` |
 | `workflow_dispatch` | Manual (`clean=true` for full reset) |
 
@@ -110,8 +110,8 @@ GitHub Actions secrets: [`mirror-sync.md`](mirror-sync.md#ci-secrets),
 automatically when `Notify.Enabled` is true.
 
 ```bash
-gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss --ref msys2-apiss-mirror-merge
-gh run list --repo msys2-apiss/msys2-apiss --workflow mirror-merge.yml --ref msys2-apiss-mirror-merge --limit 5
+gh workflow run mirror-merge.yml --repo cygapiss/msys2-apiss --ref msys2-apiss-mirror-merge
+gh run list --repo cygapiss/msys2-apiss --workflow mirror-merge.yml --ref msys2-apiss-mirror-merge --limit 5
 ```
 
 **Local full run:**
@@ -137,7 +137,7 @@ yarn mirror-merge --skip-fetch --destination-path .work/destination/msys2-apiss
 ```bash
 yarn mirror-merge --clean --destination-path .work/destination/msys2-apiss
 # CI equivalent:
-gh workflow run mirror-merge.yml --repo msys2-apiss/msys2-apiss --ref msys2-apiss-mirror-merge -f clean=true
+gh workflow run mirror-merge.yml --repo cygapiss/msys2-apiss --ref msys2-apiss-mirror-merge -f clean=true
 ```
 
 **Verify no drift** (dry-run, no push):

@@ -259,8 +259,8 @@ describe('repairSyncBranchLayout', () => {
         'Mirror sync workflow from msys2-apiss-sync'
       );
       expect(runGit(repoPath, ['log', '-1', '--format=%b', MIRROR_SYNC_BRANCH]).trim()).toBe(
-        'https://github.com/msys2-apiss/msys2-apiss-sync/tree/main/config/mirror-sync\n' +
-          'https://github.com/msys2-apiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml'
+        'https://github.com/cygapiss/msys2-apiss-sync/tree/main/config/mirror-sync\n' +
+          'https://github.com/cygapiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml'
       );
       expect(
         runGit(repoPath, ['rev-parse', `${MIRROR_SYNC_BRANCH}:.github/workflows/mirror-sync.yml`]).trim()

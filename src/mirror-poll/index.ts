@@ -45,7 +45,7 @@ function dispatchMirrorSync(
   ghDispatchMirror(MIRROR_SYNC_DISPATCH, owner, repo, contentBranch, logger, {
     ForbiddenDetail:
       'gh token cannot dispatch mirror-sync on other repos; set secret ' +
-      'SYNC_DISPATCH_TOKEN on msys2-apiss/msys2-apiss-sync ' +
+      'SYNC_DISPATCH_TOKEN on cygapiss/msys2-apiss-sync ' +
       '(same PAT as package mirror repos; workflow scope on msys2-apiss/*)'
   });
 }

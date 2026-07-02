@@ -3,7 +3,7 @@
 Copy-paste operator commands (GitHub secrets, local runs). Not the architecture
 index -- see [`README.md`](README.md) first.
 
-**Flow:** `msys2/*` upstream -> `msys2-apiss/*` mirrors -> `msys2-apiss/msys2-apiss`
+**Flow:** `msys2/*` upstream -> `msys2-apiss/*` mirrors -> `cygapiss/msys2-apiss`
 on `upstream`, `upstream-ports`, `upstream-ports-mingw`.
 
 Requires **Node.js 26+**, **Yarn**, **git**, and network when fetching mirrors.
@@ -25,7 +25,7 @@ One PAT is reused in three places:
 
 | Where | Stage | Purpose |
 |-------|-------|---------|
-| `msys2-apiss/msys2-apiss-sync` | mirror-poll | [`mirror-poll.md`](mirror-poll.md) (`GH_TOKEN` dispatches mirror-sync) |
+| `cygapiss/msys2-apiss-sync` | mirror-poll | [`mirror-poll.md`](mirror-poll.md) (`GH_TOKEN` dispatches mirror-sync) |
 | `msys2-apiss/MSYS2-packages`, `MINGW-packages` | mirror-sync | [`mirror-sync.md`](mirror-sync.md) notify step dispatches mirror-merge |
 
 Package mirrors **`MSYS2-packages`** and **`MINGW-packages`** need the secret on
@@ -44,7 +44,7 @@ so mirror-poll can trigger mirror-sync when tips differ ([`mirror-poll.md`](mirr
 ```bash
 gh secret set SYNC_DISPATCH_TOKEN --repo msys2-apiss/MSYS2-packages
 gh secret set SYNC_DISPATCH_TOKEN --repo msys2-apiss/MINGW-packages
-gh secret set SYNC_DISPATCH_TOKEN --repo msys2-apiss/msys2-apiss-sync
+gh secret set SYNC_DISPATCH_TOKEN --repo cygapiss/msys2-apiss-sync
 ```
 
 Mirror-only repos (`aports`, `glibc`, `gcc`, etc.) do not need this secret;
@@ -123,7 +123,7 @@ yarn mirror-init --skip-fetch
 ### Dry-run and verify (mirror-merge)
 
 ```bash
-git clone https://github.com/msys2-apiss/msys2-apiss.git .work/destination/msys2-apiss
+git clone https://github.com/cygapiss/msys2-apiss.git .work/destination/msys2-apiss
 yarn mirror-init --skip-fetch
 yarn mirror-merge --dry-run --skip-fetch --destination-path .work/destination/msys2-apiss
 ```

@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           mkdir -p .github
           curl -fsSL -o .github/mirror-sync.json \
-            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-sync/${{ github.event.repository.name }}.json"
+            "https://raw.githubusercontent.com/cygapiss/msys2-apiss-sync/main/config/mirror-sync/${{ github.event.repository.name }}.json"
 
       - name: Read push transport
         id: push
@@ -66,7 +66,7 @@ jobs:
 
       - name: Configure SSH push
         if: steps.push.outputs.via_ssh == 'true'
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.MIRROR_PUSH_SSH_KEY }}
 
@@ -80,7 +80,7 @@ jobs:
           set -euo pipefail
           mkdir -p .github/toolings
           curl -fsSL -o .github/toolings/mirror-sync.mjs \
-            "https://raw.githubusercontent.com/msys2-apiss/msys2-apiss-sync/main/config/mirror-template/toolings/mirror-sync.mjs"
+            "https://raw.githubusercontent.com/cygapiss/msys2-apiss-sync/main/config/mirror-template/toolings/mirror-sync.mjs"
 
       - name: Run mirror sync
         id: sync

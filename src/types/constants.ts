@@ -1,7 +1,7 @@
 /** mirror-sync tooling branch on each msys2-apiss/* mirror repo. */
 export const MIRROR_SYNC_BRANCH = 'msys2-apiss-mirror-sync';
 
-/** mirror-merge tooling branch on destination repo msys2-apiss/msys2-apiss. */
+/** mirror-merge tooling branch on destination repo cygapiss/msys2-apiss. */
 export const MIRROR_MERGE_BRANCH = 'msys2-apiss-mirror-merge';
 
 /** mirror-poll -> mirror-sync workflow_dispatch input on mirror-sync.yml. */
@@ -24,7 +24,7 @@ export const MIRROR_TEMPLATE_DIR = 'config/mirror-template';
 /** Per-mirror mirror-sync config; repo name matches filename (<repo>.json). */
 export const MIRROR_SYNC_CONFIG_DIR = 'config/mirror-sync';
 
-/** Prebuilt mirror-sync/mirror-merge bundles (yarn pack-toolings). */
+/** Prebuilt mirror-sync/mirror-merge bundles (yarn run pack). */
 export const MIRROR_TOOLINGS_TEMPLATE_DIR = 'config/mirror-template/toolings';
 
 /** mirror-merge replay config path under downloaded .github/toolings/ in CI. */

@@ -24,9 +24,9 @@ repos, stages, CI boundaries, or operator flows.
 
 | Principle | Detail |
 |-----------|--------|
-| **Runtime entry** | **Local checkout** of [`msys2-apiss/msys2-apiss-sync`](https://github.com/msys2-apiss/msys2-apiss-sync) -- all operator commands run here |
+| **Runtime entry** | **Local checkout** of [`cygapiss/msys2-apiss-sync`](https://github.com/cygapiss/msys2-apiss-sync) -- all operator commands run here |
 | External upstream | `UpstreamUrl` in `config/mirror-sync/*.json` only; not a workflow actor |
-| mirror-init | From **msys2-apiss/msys2-apiss-sync** code/templates: install **mirror-sync** on each `msys2-apiss/*` mirror (branch **`msys2-apiss-mirror-sync`**) and **mirror-merge** CI on destination branch **`msys2-apiss-mirror-merge`** on **`msys2-apiss/msys2-apiss`**. Same [Tooling branch layout](mirror-init.md#tooling-branch-layout) for both. Every `yarn mirror-init` run deploys/repairs these (unless digest-pinned); **`--push`** pushes bootstrapped repos and dispatches mirror-sync/mirror-merge; end dispatch of mirror-poll unless **`--no-poll`** ([`mirror-poll.md`](mirror-poll.md)) |
+| mirror-init | From **cygapiss/msys2-apiss-sync** code/templates: install **mirror-sync** on each `msys2-apiss/*` mirror (branch **`msys2-apiss-mirror-sync`**) and **mirror-merge** CI on destination branch **`msys2-apiss-mirror-merge`** on **`cygapiss/msys2-apiss`**. Same [Tooling branch layout](mirror-init.md#tooling-branch-layout) for both. Every `yarn mirror-init` run deploys/repairs these (unless digest-pinned); **`--push`** pushes bootstrapped repos and dispatches mirror-sync/mirror-merge; end dispatch of mirror-poll unless **`--no-poll`** ([`mirror-poll.md`](mirror-poll.md)) |
 | mirror-poll | Compare tips; trigger mirror-sync when behind. See [`mirror-poll.md`](mirror-poll.md) |
 | mirror-sync | [`mirror-sync.md`](mirror-sync.md) -- fast-forward content branch; package mirrors dispatch mirror-merge when `Notify.Enabled` |
 | mirror-merge | [`mirror-merge.md`](mirror-merge.md) |
@@ -36,12 +36,12 @@ repos, stages, CI boundaries, or operator flows.
 
 | GitHub repo | mirror-init role |
 |-------------|------------------|
-| **`msys2-apiss/msys2-apiss-sync`** (tooling) | Source of templates + TypeScript; [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on **`main`** ([`mirror-poll.md`](mirror-poll.md)) |
+| **`cygapiss/msys2-apiss-sync`** (tooling) | Source of templates + TypeScript; [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on **`main`** ([`mirror-poll.md`](mirror-poll.md)) |
 | **`msys2-apiss/*`** (mirror repos) | Install [`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml) on branch **`msys2-apiss-mirror-sync`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)); bootstrap `.work/mirrors/<repo>/` locally |
-| **`msys2-apiss/msys2-apiss`** (destination) | Install [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on branch **`msys2-apiss-mirror-merge`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)) |
+| **`cygapiss/msys2-apiss`** (destination) | Install [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on branch **`msys2-apiss-mirror-merge`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)) |
 
 With **`--push`**, mirror-init pushes mirror workflow branches to **`msys2-apiss/*`**
-and the mirror-merge workflow branch to **`msys2-apiss/msys2-apiss`**, then dispatches
+and the mirror-merge workflow branch to **`cygapiss/msys2-apiss`**, then dispatches
 mirror-sync on each pushed mirror repo.
 
 ## Repo map
@@ -50,7 +50,7 @@ mirror-sync on each pushed mirror repo.
 |------|--------------|------------------|----------|
 | `msys2-apiss-sync` (tooling repo) | Yes (TypeScript + templates) | mirror-poll: `mirror-poll.yml` on `main` | mirror-sync notify -> mirror-merge (package mirrors) |
 | `msys2-apiss/*` (mirror repos) | No (content only) | mirror-sync: `mirror-sync.yml` on `msys2-apiss-mirror-sync` (installed by mirror-init) | mirror-poll `workflow_dispatch_mirror_sync`; updates mirror content branch |
-| `msys2-apiss/msys2-apiss` (destination) | No (replay output only) | mirror-merge: `mirror-merge.yml` on **`msys2-apiss-mirror-merge`** (installed by mirror-init) | `workflow_dispatch` from mirror-sync notify or manual; pushes `upstream*` |
+| `cygapiss/msys2-apiss` (destination) | No (replay output only) | mirror-merge: `mirror-merge.yml` on **`msys2-apiss-mirror-merge`** (installed by mirror-init) | `workflow_dispatch` from mirror-sync notify or manual; pushes `upstream*` |
 | `msys2/*`, SourceForge, etc. | N/A | N/A | mirror-poll reads upstream tip via `ls-remote` |
 
 ## Workflow by stage
@@ -58,10 +58,10 @@ mirror-sync on each pushed mirror repo.
 | Stage | Repo | Workflow | Command / runs | Output |
 |-------|------|----------|----------------|--------|
 | config | External (`msys2/*`, ...) | None | `config/mirror-sync/*.json` | -- |
-| mirror-init | `msys2-apiss/msys2-apiss-sync` | None | `yarn mirror-init` `[--push] [--no-poll] [--repo <name>]` | mirror-sync/mirror-merge deployed |
-| mirror-poll | `msys2-apiss/msys2-apiss-sync` | [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on `main` | [`yarn mirror-poll`](mirror-poll.md); CI cron | mirror-sync triggered |
+| mirror-init | `cygapiss/msys2-apiss-sync` | None | `yarn mirror-init` `[--push] [--no-poll] [--repo <name>]` | mirror-sync/mirror-merge deployed |
+| mirror-poll | `cygapiss/msys2-apiss-sync` | [`mirror-poll.yml`](../.github/workflows/mirror-poll.yml) on `main` | [`yarn mirror-poll`](mirror-poll.md); CI cron | mirror-sync triggered |
 | mirror-sync | **`msys2-apiss/*` mirror repos** | [`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml) on `msys2-apiss-mirror-sync` | mirror-poll dispatch | Mirror updated; mirror-merge when `Notify.Enabled` |
-| mirror-merge | `msys2-apiss/msys2-apiss` | [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on **`msys2-apiss-mirror-merge`** | [`yarn mirror-merge`](mirror-merge.md); CI dispatch | Destination replay complete |
+| mirror-merge | `cygapiss/msys2-apiss` | [`mirror-merge.yml`](../config/mirror-template/mirror-merge.yml) on **`msys2-apiss-mirror-merge`** | [`yarn mirror-merge`](mirror-merge.md); CI dispatch | Destination replay complete |
 
 ```mermaid
 flowchart TB
@@ -85,7 +85,7 @@ runs on tooling repo `main`.
 
 ## Operator flows
 
-All flows start from a **local checkout** of `msys2-apiss/msys2-apiss-sync` unless noted.
+All flows start from a **local checkout** of `cygapiss/msys2-apiss-sync` unless noted.
 Copy-paste commands: [`usage.md`](usage.md).
 
 | Scenario | mirror-init / mirror-poll / mirror-sync | mirror-merge |

@@ -1,0 +1,98 @@
+---
+description: How agents edit src/ (layout, imports, replay, runtime)
+globs: "src/**/*.ts"
+alwaysApply: true
+---
+
+# Editing src/
+
+Project-specific rules when changing files under `src/`. Apply together with
+`minimal-and-safe-editing.mdc`. Architecture and operator detail live in
+`docs/` and `AGENTS.md`; this file is agent editing constraints only.
+
+## Runtime
+
+- Require Node.js 26+.
+- Run TypeScript source directly with Node type stripping.
+- Use erasable TypeScript syntax only: no enums, namespaces, or parameter
+  properties.
+- Use `.ts` extensions in relative ESM imports.
+
+## Structure
+
+Allowed top-level folders under `src/`:
+
+- `src/git/`
+- `src/types/`
+- `src/mirror-init/`
+- `src/mirror-poll/`
+- `src/mirror-sync/`
+- `src/mirror-merge/`
+
+Do not add new top-level folders under `src/` without discussing with the
+maintainer first.
+
+- Stage entry points: `src/mirror-*/cli.ts`.
+- Shared git helpers: `src/git/*.ts`.
+- Shared sync types: `src/types/*.ts`.
+- Config defaults: `config/mirror-merge.json`; scripts read config and do not write it.
+
+## Mirror stage modules
+
+Stages under `src/mirror-init/`, `src/mirror-poll/`, `src/mirror-sync/`, and
+`src/mirror-merge/` are self-contained pipeline stages. Each stage owns its CLI
+entry (`cli.ts`), config, and every helper used only by that stage.
+
+### Allowed cross-module imports
+
+Only these paths may be imported from outside the stage directory:
+
+- `../git/*` -- git subprocess helpers and `Logger`
+- `../types/*` -- shared types and constants (e.g. `mirror-sync-config`)
+
+Do not add new entries to this list (or new allowed cross-module import paths in
+code) without discussing with the maintainer first.
+
+Also allowed:
+
+- Node.js built-ins
+- Relative imports within the same stage (`./config.ts`, `./tooling-digest.ts`, ...)
+
+### Forbidden imports
+
+Do not import:
+
+- Any other stage (`../mirror-init/*`, `../mirror-poll/*`, `../mirror-sync/*`,
+  `../mirror-merge/*`)
+- Any other top-level `src/*` tree not listed in Structure (no `../lib/*`,
+  `../cli/*`, ...)
+
+### Where helpers belong
+
+- **One stage only:** keep the module in that stage directory (e.g.
+  `src/mirror-init/tooling-digest.ts`, `src/mirror-merge/queue.ts`).
+- **Two or more stages:** shared types and constants in `src/types/`; git
+  subprocess wrappers in `src/git/`.
+- **Do not** add `src/lib/` or cross-import between stages. Do not move a helper
+  out of a stage until a second stage actually needs it.
+
+## Git Replay
+
+- Use the `git` CLI only.
+- Preserve upstream author metadata in `GIT_AUTHOR_*`.
+- Preserve upstream committer metadata in `GIT_COMMITTER_*`.
+- Message body is LF only and follows the template in `config/mirror-merge.json` (`Sources[].CommitMessage`).
+- On failure mid-batch, stop without pushing; re-run without `--clean` to continue from branch cursors.
+- First replayed commit parent is `config/mirror-merge.json` -> `Destination.BaseCommit`.
+- Bootstrap when any sync branch is missing; `--clean` resets sync branches first.
+
+## Logging
+
+- Print progress with `[sync]`, `[sync][warn]`, and `[sync][error]`.
+- Exit non-zero on failure; exit zero when there is nothing to do or sync
+  succeeds.
+
+## External Tools
+
+- Required: `git`.
+- Optional in CI: `gh` for upstream SHA checks.

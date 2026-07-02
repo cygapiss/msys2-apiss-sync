@@ -1,7 +1,7 @@
 # Agent guide: msys2-apiss-sync
 
 This repository builds cross-platform TypeScript tooling to replay upstream
-MSYS2 package history into `msys2-apiss/msys2-apiss`.
+MSYS2 package history into `cygapiss/msys2-apiss`.
 
 ## Read first
 
@@ -16,7 +16,7 @@ MSYS2 package history into `msys2-apiss/msys2-apiss`.
 ## Key facts
 
 - **Sources**: mirror `msys2-apiss/*`, commit footer `UpstreamRepo` `msys2/MSYS2-packages` -> `ports/`, `msys2/MINGW-packages` -> `ports-mingw/`
-- **Destination**: `msys2-apiss/msys2-apiss`, branch `upstream`
+- **Destination**: `cygapiss/msys2-apiss`, branch `upstream`
 - **Base commit**: `6fc20894663468a04dd4986a8b1c15a9d5ae8649` (parent of first replayed commit)
 - **Strategy**: deterministic date-ordered replay; same SHAs on every rebuild at same pins
 - **Triggers**: mirror-poll (~hourly cron, push to `main`); mirror-sync -> mirror-merge `workflow_dispatch` after mirrors advance. Expect ~1 h end-to-end latency.

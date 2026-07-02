@@ -36,8 +36,8 @@ import type { Logger } from '../git/log.ts';
 
 export const MIRROR_SYNC_COMMIT_MESSAGE =
   'Mirror sync workflow from msys2-apiss-sync\n\n' +
-  'https://github.com/msys2-apiss/msys2-apiss-sync/tree/main/config/mirror-sync\n' +
-  'https://github.com/msys2-apiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml';
+  'https://github.com/cygapiss/msys2-apiss-sync/tree/main/config/mirror-sync\n' +
+  'https://github.com/cygapiss/msys2-apiss-sync/blob/main/config/mirror-template/mirror-sync.yml';
 
 
 function loadMirrorUpstreamUrl(repoRoot: string, repoName: string): string | null {

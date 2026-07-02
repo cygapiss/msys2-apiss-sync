@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions workflow conventions for upstream sync
-alwaysApply: false
+alwaysApply: true
 ---
 # GitHub Actions
 
@@ -13,7 +13,7 @@ Full copy-paste steps: [`docs/usage.md`](../docs/usage.md).
 | File | Purpose |
 |------|---------|
 | `mirror-poll.yml` | mirror-poll: [`mirror-poll.md`](../docs/mirror-poll.md) |
-| `config/mirror-template/mirror-merge.yml` (installed on **`msys2-apiss/msys2-apiss`**, branch `msys2-apiss-mirror-merge`; [Tooling branch layout](../docs/mirror-init.md#tooling-branch-layout)) | mirror-merge: [`mirror-merge.md`](../docs/mirror-merge.md) |
+| `config/mirror-template/mirror-merge.yml` (installed on **`cygapiss/msys2-apiss`**, branch `msys2-apiss-mirror-merge`; [Tooling branch layout](../docs/mirror-init.md#tooling-branch-layout)) | mirror-merge: [`mirror-merge.md`](../docs/mirror-merge.md) |
 
 Dry-run manifest verification: [`mirror-merge.md`](../docs/mirror-merge.md) and
 [`usage.md`](../docs/usage.md).
@@ -70,7 +70,7 @@ Manual mirror-merge runs use the same `workflow_dispatch` API (`gh workflow run 
 
 Set with `gh secret set`; not used by local tooling (`gh auth login` instead).
 
-- `SYNC_DISPATCH_TOKEN`: same PAT on **`msys2-apiss/msys2-apiss-sync`** (mirror-poll;
+- `SYNC_DISPATCH_TOKEN`: same PAT on **`cygapiss/msys2-apiss-sync`** (mirror-poll;
   [`mirror-poll.md`](../docs/mirror-poll.md)) and on package mirrors
   **`MSYS2-packages`**, **`MINGW-packages`** ([`mirror-sync.md`](../docs/mirror-sync.md)
   notify: `gh workflow run mirror-merge.yml` on destination when `Notify.Enabled` is true).
@@ -94,5 +94,5 @@ permissions:
   contents: read   # this repo
 ```
 
-CI clone/push to `msys2-apiss/msys2-apiss` uses `gh` with `GH_TOKEN`:
+CI clone/push to `cygapiss/msys2-apiss` uses `gh` with `GH_TOKEN`:
 `${{ github.token }}`.

@@ -71,12 +71,12 @@ describe('getMirrorSyncNotify', () => {
     expect(getMirrorSyncNotify(mirrorConfig('https://example.com/upstream.git', {
       Notify: {
         Enabled: true,
-        Repository: 'msys2-apiss/msys2-apiss',
+        Repository: 'cygapiss/msys2-apiss',
         EventType: 'workflow_dispatch_mirror_merge'
       }
     }))).toEqual({
       Enabled: true,
-      Repository: 'msys2-apiss/msys2-apiss',
+      Repository: 'cygapiss/msys2-apiss',
       EventType: 'workflow_dispatch_mirror_merge'
     });
   });
@@ -85,11 +85,11 @@ describe('getMirrorSyncNotify', () => {
     expect(getMirrorSyncNotify(mirrorConfig('https://example.com/upstream.git', {
       Notify: {
         Enabled: true,
-        Repository: 'msys2-apiss/msys2-apiss'
+        Repository: 'cygapiss/msys2-apiss'
       }
     }))).toEqual({
       Enabled: true,
-      Repository: 'msys2-apiss/msys2-apiss',
+      Repository: 'cygapiss/msys2-apiss',
       EventType: 'workflow_dispatch_mirror_merge'
     });
   });
@@ -99,7 +99,7 @@ describe('shouldDispatchMirrorMerge', () => {
   test('is true only when mirror advanced and notify is enabled', () => {
     expect(shouldDispatchMirrorMerge({
       Advanced: true,
-      Notify: { Enabled: true, Repository: 'msys2-apiss/msys2-apiss' }
+      Notify: { Enabled: true, Repository: 'cygapiss/msys2-apiss' }
     })).toBe(true);
     expect(shouldDispatchMirrorMerge({
       Advanced: true,
@@ -107,7 +107,7 @@ describe('shouldDispatchMirrorMerge', () => {
     })).toBe(false);
     expect(shouldDispatchMirrorMerge({
       Advanced: false,
-      Notify: { Enabled: true, Repository: 'msys2-apiss/msys2-apiss' }
+      Notify: { Enabled: true, Repository: 'cygapiss/msys2-apiss' }
     })).toBe(false);
   });
 });
@@ -207,7 +207,7 @@ describe('runMirrorSync', () => {
         Config: mirrorConfig(upstreamPath, {
           Notify: {
             Enabled: true,
-            Repository: 'msys2-apiss/msys2-apiss'
+            Repository: 'cygapiss/msys2-apiss'
           }
         }),
         Logger: noopLogger
@@ -233,7 +233,7 @@ describe('writeGitHubOutput', () => {
         DispatchMirrorMerge: true,
         Notify: {
           Enabled: true,
-          Repository: 'msys2-apiss/msys2-apiss',
+          Repository: 'cygapiss/msys2-apiss',
           EventType: 'workflow_dispatch_mirror_merge'
         },
         Branches: []

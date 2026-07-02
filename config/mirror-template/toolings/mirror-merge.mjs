@@ -47,7 +47,7 @@ function readIntOption(args, name, fallback = 0) {
 var MIRROR_SYNC_BUNDLE = "mirror-sync.mjs";
 /** mirror-merge bundled CLI filename (committed in tooling repo; CI downloads by URL). */
 var MIRROR_MERGE_BUNDLE = "mirror-merge.mjs";
-/** Prebuilt mirror-sync/mirror-merge bundles (yarn pack-toolings). */
+/** Prebuilt mirror-sync/mirror-merge bundles (yarn run pack). */
 var MIRROR_TOOLINGS_TEMPLATE_DIR = "config/mirror-template/toolings";
 /** mirror-merge replay config in the tooling repo (local yarn mirror-merge). */
 var MIRROR_MERGE_CONFIG_PATH = "config/mirror-merge.json";

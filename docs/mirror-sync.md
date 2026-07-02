@@ -3,7 +3,7 @@
 mirror-sync fast-forwards each mirror's **content branch** from upstream and optionally
 dispatches mirror-merge. Pipeline: [`README.md`](README.md). Code:
 `src/mirror-sync/`. CI bundle: `config/mirror-template/toolings/mirror-sync.mjs`
-(`yarn pack-toolings`). Workflow template:
+(`yarn run pack`). Workflow template:
 [`mirror-sync.yml`](../config/mirror-template/mirror-sync.yml) on branch
 **`msys2-apiss-mirror-sync`** ([Tooling branch layout](mirror-init.md#tooling-branch-layout)).
 
@@ -54,7 +54,7 @@ downloads at runtime -- not committed on mirror repos).
 | `UpstreamUrl` | External upstream git URL |
 | `Branches[]` | `Upstream` branch to fetch; `Mirror` content branch to push |
 | `Notify.Enabled` | When true, dispatch mirror-merge after advance |
-| `Notify.Repository` | Destination repo (default `msys2-apiss/msys2-apiss`) |
+| `Notify.Repository` | Destination repo (default `cygapiss/msys2-apiss`) |
 | `PushViaSsh` | Use SSH push (large mirrors, e.g. gcc) |
 | `SyncTags` | Mirror tags when true |
 | `Description`, `Url` | Optional; mirror-init `gh repo create` metadata |

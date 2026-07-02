@@ -8,7 +8,7 @@ alwaysApply: true
 ## Purpose
 
 Replay commit history from synced mirrors `msys2-apiss/MSYS2-packages` and
-`msys2-apiss/MINGW-packages` into `msys2-apiss/msys2-apiss` on branch `upstream`.
+`msys2-apiss/MINGW-packages` into `cygapiss/msys2-apiss` on branch `upstream`.
 
 ## Path mapping
 
@@ -18,7 +18,7 @@ Replay commit history from synced mirrors `msys2-apiss/MSYS2-packages` and
 ## Base commit
 
 First replayed commit parents `6fc20894663468a04dd4986a8b1c15a9d5ae8649` on
-`msys2-apiss/msys2-apiss`. Bootstrap/rebuild reset `upstream` to this SHA before replay.
+`cygapiss/msys2-apiss`. Bootstrap/rebuild reset `upstream` to this SHA before replay.
 Do not rewrite the base commit from sync tooling.
 
 ## Replay rules

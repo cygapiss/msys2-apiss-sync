@@ -11,7 +11,7 @@ import {
   pinRepoDigest,
   repoNeedsBootstrap,
   saveDigestMap
-} from '../../src/lib/tooling-digest.ts';
+} from '../../src/mirror-init/tooling-digest.ts';
 import { TOOLING_DIGEST_PATH } from '../../src/types/constants.ts';
 
 function writeDigestInputs(

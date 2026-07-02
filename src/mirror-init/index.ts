@@ -33,7 +33,7 @@ import {
   pinRepoDigest,
   repoNeedsBootstrap,
   saveDigestMap
-} from '../lib/tooling-digest.ts';
+} from './tooling-digest.ts';
 import {
   MIRROR_MERGE_BRANCH,
   MIRROR_SYNC_BRANCH,

@@ -18,7 +18,7 @@ import {
   TOOLING_REPO_RAW_BASE
 } from '../../src/types/constants.ts';
 
-describe('pack-toolings bundles', () => {
+describe('yarn pack bundles', () => {
   test('prebuilt mirror-sync and mirror-merge mjs exist', () => {
     const repoRoot = getSyncRepoRoot();
     expect(bundledTemplateExists(repoRoot, MIRROR_SYNC_BUNDLE_FILE)).toBe(true);

@@ -3,7 +3,7 @@
 `yarn mirror-poll` compares upstream vs mirror tips and dispatches mirror-sync when behind.
 Pipeline: [`README.md`](README.md). Secrets: [`usage.md`](usage.md#setup-sync_dispatch_token).
 Code: `src/mirror-poll/`. Workflow: [`.github/workflows/mirror-poll.yml`](../.github/workflows/mirror-poll.yml)
-on **`msys2-apiss/msys2-apiss-sync`** `main`.
+on **`cygapiss/msys2-apiss-sync`** `main`.
 
 ## Command
 
@@ -88,7 +88,7 @@ new repo on the next cron or mirror-init end dispatch.
 **Manual mirror-poll:**
 
 ```bash
-gh workflow run mirror-poll.yml --repo msys2-apiss/msys2-apiss-sync --ref main
+gh workflow run mirror-poll.yml --repo cygapiss/msys2-apiss-sync --ref main
 ```
 
 ## Mirror list (reference)

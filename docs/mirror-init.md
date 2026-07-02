@@ -19,7 +19,7 @@ yarn mirror-init [--repo <name>] [--skip-fetch] [--push] [--no-poll]
 
 Requires `gh auth login` unless `--no-poll`.
 
-After changing mirror-sync/mirror-merge TypeScript: `yarn pack-toolings` (writes
+After changing mirror-sync/mirror-merge TypeScript: `yarn run pack` (writes
 `config/mirror-template/toolings/*.mjs`).
 
 mirror-init copies **`mirror-sync.yml`** / **`mirror-merge.yml`** only. Per-mirror JSON,
@@ -31,7 +31,7 @@ from `msys2-apiss-sync` `main`.
 | Target | Tooling branch | Workflow | Content branch |
 |--------|----------------|----------|----------------|
 | Each `msys2-apiss/*` mirror | **`msys2-apiss-mirror-sync`** | `mirror-sync.yml` | `master` or `Branches[].Mirror` |
-| **`msys2-apiss/msys2-apiss`** | **`msys2-apiss-mirror-merge`** | `mirror-merge.yml` | **`main`** |
+| **`cygapiss/msys2-apiss`** | **`msys2-apiss-mirror-merge`** | `mirror-merge.yml` | **`main`** |
 
 Local paths: `.work/mirrors/<repo>/`, `.work/mirror-merge-ci/`. Content branches stay
 workflow-free.
@@ -86,7 +86,7 @@ yarn mirror-init --push              # after mirror-merge.yml change (destinatio
 ```
 
 Missing or invalid `config/digest.json`: treated as unpinned. Invalid JSON logs a
-warning and treats the map as empty. Code: `src/lib/tooling-digest.ts`.
+warning and treats the map as empty. Code: `src/mirror-init/tooling-digest.ts`.
 
 ## Run behavior
 
