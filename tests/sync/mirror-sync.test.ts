@@ -208,6 +208,56 @@ describe('runMirrorSync', () => {
     }
   });
 
+  test('force-pushes when mirror tip diverged from upstream', () => {
+    const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-mirror-sync-diverge-'));
+    try {
+      const upstreamPath = join(root, 'upstream');
+      const mirrorPath = join(root, 'mirror');
+      const originPath = join(root, 'origin.git');
+
+      initRepo(upstreamPath);
+      writeFileSync(join(upstreamPath, 'pkg.txt'), 'base\n', 'utf8');
+      runGit(upstreamPath, ['add', 'pkg.txt']);
+      runGit(upstreamPath, ['commit', '-m', 'shared base']);
+      const baseSha = runGit(upstreamPath, ['rev-parse', 'HEAD']).trim();
+
+      runGit(null, ['init', '--bare', originPath]);
+      initRepo(mirrorPath);
+      runGit(mirrorPath, ['remote', 'add', 'origin', originPath]);
+      runMirrorSync({
+        RepoPath: mirrorPath,
+        Config: mirrorConfig(upstreamPath),
+        Logger: noopLogger
+      });
+      expect(runGit(originPath, ['rev-parse', 'master']).trim()).toBe(baseSha);
+
+      writeFileSync(join(upstreamPath, 'pkg.txt'), 'upstream rewrite\n', 'utf8');
+      runGit(upstreamPath, ['add', 'pkg.txt']);
+      runGit(upstreamPath, ['commit', '--amend', '-m', 'upstream rewritten']);
+      const upstreamTip = runGit(upstreamPath, ['rev-parse', 'HEAD']).trim();
+
+      const originWork = join(root, 'origin-work');
+      runGit(null, ['clone', originPath, originWork]);
+      runGit(originWork, ['config', 'user.name', 'Test User']);
+      runGit(originWork, ['config', 'user.email', 'test@example.com']);
+      writeFileSync(join(originWork, 'pkg.txt'), 'mirror only\n', 'utf8');
+      runGit(originWork, ['add', 'pkg.txt']);
+      runGit(originWork, ['commit', '-m', 'mirror-only commit']);
+      runGit(originWork, ['push', 'origin', 'master']);
+
+      const result = runMirrorSync({
+        RepoPath: mirrorPath,
+        Config: mirrorConfig(upstreamPath),
+        Logger: noopLogger
+      });
+      expect(result.Advanced).toBe(true);
+      expect(result.PrimarySha).toBe(upstreamTip);
+      expect(runGit(originPath, ['rev-parse', 'master']).trim()).toBe(upstreamTip);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('sets DispatchMirrorMerge when advanced and notify enabled', () => {
     const root = mkdtempSync(join(tmpdir(), 'msys2-apiss-mirror-sync-dispatch-'));
     try {

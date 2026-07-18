@@ -30,7 +30,7 @@ For each repo in `config/mirror-poll.json` `Repos`:
 Upstream tips use GitHub API when `UpstreamUrl` is GitHub; otherwise `git ls-remote`.
 Mirror tips use `gh` on the content branch (not the tooling branch).
 
-mirror-sync then fast-forwards the mirror content branch ([`mirror-sync.md`](mirror-sync.md)).
+mirror-sync then force-pushes the mirror content branch ([`mirror-sync.md`](mirror-sync.md)).
 Package mirrors with `Notify.Enabled: true` may dispatch mirror-merge; mirror-only repos
 stop after mirror-sync.
 
@@ -102,7 +102,7 @@ gh workflow run mirror-poll.yml --repo cygapiss/msys2-apiss-sync --ref main
 ## Related
 
 - [`mirror-init.md`](mirror-init.md) -- tooling install; `--no-poll`
-- [`mirror-sync.md`](mirror-sync.md) -- fast-forward and notify
+- [`mirror-sync.md`](mirror-sync.md) -- force-push and notify
 - [`README.md`](README.md) -- documentation entry
 - [`usage.md`](usage.md) -- operator commands and PAT setup
 - [`mirror-merge.md`](mirror-merge.md) -- package replay sources and `Notify.Enabled`

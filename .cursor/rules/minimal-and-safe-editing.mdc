@@ -1,12 +1,17 @@
 ---
-description: Minimal and safe editing
+description: Minimal and safe editing (mase)
 alwaysApply: true
 ---
 
 # Minimal and Safe Editing
 
-Apply this every time you edit code, reply, commit, or open a PR. It covers
-scope, style, interfaces, contracts, encoding, and text fidelity.
+Also known as **mase**. `mase.mdc` is a shortcut for this rule
+(`minimal-and-safe-editing.mdc`). When the user says "mase", "@mase",
+"mase.mdc", or "sync mase rule", they mean this rule.
+
+Apply this to every text edit: source code, configs, docs, plans, rules,
+comments, chat replies, commits, and PRs. It covers scope, style, interfaces,
+contracts, encoding, and text fidelity.
 
 ## Core principle
 
@@ -71,6 +76,16 @@ When in doubt, leave the code as is.
 - Run `git reset --hard` or other destructive git commands that wipe work (see
   "Git working tree safety").
 
+## No scratch files at repo root
+
+Do not create logs, captures, or debug dumps under the repository root. Put
+ephemeral agent files under `.cursor/tmp/` (e.g. `.cursor/tmp/logs/`,
+`.cursor/tmp/xemu-runs/`); keep that path in `.gitignore`. Redirect
+stdout/stderr from builds, xemu, or scripts to `.cursor/tmp/`, not root-level
+`out-*.txt` /
+`err-*.txt`. Root is for tracked files, standard build dirs (`build-debug/`,
+`build/`), or paths the user explicitly requests.
+
 ## Interfaces and contracts
 
 Treat anything other code, scripts, or users depend on as a fixed contract:
@@ -110,7 +125,8 @@ Applies to all text you write or edit: code, comments, docs, chat, commits, PRs.
   base content; do not "fix" it by normalizing punctuation.
 - Do not reflow or wrap untouched lines. Wrap only a line you functionally edit,
   and only when it aids correctness or local readability, or when asked.
-- All docs under `docs/` must use UTF-8 encoding by default (no BOM preferred).
+- Use UTF-8 encoding by default (no BOM preferred) for all text: source code,
+  configs, docs, plans, rules, shell scripts, commits, and PRs.
 
 ## Planning and execution
 
@@ -120,6 +136,49 @@ Applies to all text you write or edit: code, comments, docs, chat, commits, PRs.
   follow-ups, or optional improvements unless asked or scope is unclear.
 - Do not start long builds, installs, or full test suites unless asked, or to
   run a minimal check that verifies your requested change.
+
+## Plans and docs
+
+When writing or editing plans, docs, comments, architecture guides, or operator
+guides:
+
+- Do not use numbered phase IDs or step IDs (`Phase 1`, `Phase 2`, `Step 1`,
+  `Step 2`, and so on). Numbered labels churn when order changes and do not
+  name what the piece does.
+- Name stages, workflows, and doc files with descriptive slugs (kebab-case
+  words that say what the piece does).
+- Prefer one slug-named doc per major stage when detail warrants it, plus a
+  README or index that links them.
+- In prose and comments, refer to stages by slug name (`widget-init`, not
+  "phase 1"). Use tables and cross-links between slug-named docs instead of a
+  single numbered checklist.
+
+Example (good):
+
+```markdown
+# Widget pipeline
+
+**Start here.** Index and architecture. Edit this file first when stages or
+operator flows change.
+
+| Doc | Role |
+|-----|------|
+| `README.md` | Index and pipeline overview |
+| `widget-init.md` | Bootstrap local checkouts |
+| `widget-sync.md` | Fast-forward content from upstream |
+| `widget-merge.md` | Replay into destination |
+
+**Pipeline:** config -> **widget-init** -> **widget-sync** -> **widget-merge**.
+
+## Operator flows
+
+| Scenario | widget-init / widget-sync | widget-merge |
+|----------|---------------------------|--------------|
+| Local init only | `yarn widget-init` | -- |
+| Full refresh | `yarn widget-init --push` -> widget-sync | widget-merge CI or `yarn widget-merge` |
+```
+
+Example (bad): `Phase 1: init`, `Step 2: sync`, `docs/plan-phase-3.md`.
 
 ## Git working tree safety
 

@@ -1,6 +1,6 @@
 # mirror-sync
 
-mirror-sync fast-forwards each mirror's **content branch** from upstream and optionally
+mirror-sync force-pushes each mirror's **content branch** to match upstream and optionally
 dispatches mirror-merge. Pipeline: [`README.md`](README.md). Code:
 `src/mirror-sync/`. CI bundle: `config/mirror-template/toolings/mirror-sync.mjs`
 (`yarn run pack`). Workflow template:
@@ -17,7 +17,7 @@ For each `Branches[]` entry in `config/mirror-sync/<repo>.json`:
 1. Ensure `upstream` remote = `UpstreamUrl`
 2. `git fetch upstream <UpstreamBranch>`
 3. Compare with `origin/<MirrorBranch>` (content branch, not tooling branch)
-4. If different: fast-forward push to the mirror content branch (`PushViaSsh` when set)
+4. If different: force-push upstream tip to the mirror content branch (`PushViaSsh` when set)
 5. If `SyncTags`: fetch and push tags
 
 Content branches (`master` or configured `Mirror`) hold pure upstream history with

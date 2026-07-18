@@ -28,7 +28,7 @@ repos, stages, CI boundaries, or operator flows.
 | External upstream | `UpstreamUrl` in `config/mirror-sync/*.json` only; not a workflow actor |
 | mirror-init | From **cygapiss/msys2-apiss-sync** code/templates: install **mirror-sync** on each `msys2-apiss/*` mirror (branch **`msys2-apiss-mirror-sync`**) and **mirror-merge** CI on destination branch **`msys2-apiss-mirror-merge`** on **`cygapiss/msys2-apiss`**. Same [Tooling branch layout](mirror-init.md#tooling-branch-layout) for both. Every `yarn mirror-init` run deploys/repairs these (unless digest-pinned); **`--push`** pushes bootstrapped repos and dispatches mirror-sync/mirror-merge; end dispatch of mirror-poll unless **`--no-poll`** ([`mirror-poll.md`](mirror-poll.md)) |
 | mirror-poll | Compare tips; trigger mirror-sync when behind. See [`mirror-poll.md`](mirror-poll.md) |
-| mirror-sync | [`mirror-sync.md`](mirror-sync.md) -- fast-forward content branch; package mirrors dispatch mirror-merge when `Notify.Enabled` |
+| mirror-sync | [`mirror-sync.md`](mirror-sync.md) -- force-push content branch; package mirrors dispatch mirror-merge when `Notify.Enabled` |
 | mirror-merge | [`mirror-merge.md`](mirror-merge.md) |
 | Git surface | TypeScript wraps `git` subprocesses only |
 

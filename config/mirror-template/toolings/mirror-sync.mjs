@@ -304,6 +304,7 @@ function syncMirrorBranch(input) {
 	Logger.write(`Advanced ${Branch.Mirror} from ${beforeSha ?? "<none>"} to ${afterSha}`);
 	runGit(RepoPath, [
 		"push",
+		"--force",
 		"origin",
 		`upstream/${Branch.Upstream}:refs/heads/${Branch.Mirror}`
 	], {}, 5, Logger);

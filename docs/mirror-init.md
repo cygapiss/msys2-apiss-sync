@@ -110,7 +110,7 @@ reuse complete clones when possible.
 
 ## Related
 
-- [`mirror-sync.md`](mirror-sync.md) -- fast-forward and dispatch 404 troubleshooting
+- [`mirror-sync.md`](mirror-sync.md) -- force-push and dispatch 404 troubleshooting
 - [`mirror-poll.md`](mirror-poll.md) -- tip compare and dispatch
 - [`mirror-merge.md`](mirror-merge.md) -- destination replay
 - [`README.md`](README.md) -- documentation entry (pipeline architecture)
